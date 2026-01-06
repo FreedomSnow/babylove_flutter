@@ -1,7 +1,7 @@
 /// 网络请求配置类
 class NetworkConfig {
   /// API 基础 URL
-  static const String baseUrl = 'https://api.example.com';
+  static const String baseUrl = 'https://babycare-dev.dujiepeng.top';
 
   /// 连接超时时间（毫秒）
   static const int connectTimeout = 30000;
@@ -24,6 +24,6 @@ class NetworkConfig {
   /// 请求头
   static Map<String, dynamic> get headers => {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'accept': 'application/json',
       };
 }

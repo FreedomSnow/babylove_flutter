@@ -4,6 +4,7 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import 'network_config.dart';
 import 'network_exception.dart';
 import 'response_model.dart';
+import 'response_model_string_code.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 
@@ -277,5 +278,69 @@ class HttpClient {
   /// 取消所有请求
   void cancelRequests({CancelToken? cancelToken}) {
     cancelToken?.cancel('Request cancelled');
+  }
+
+  /// POST 请求（支持字符串类型的 code）
+  Future<ApiResponseWithStringCode<T>> postWithStringCode<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+    T Function(dynamic json)? fromJson,
+  }) async {
+    try {
+      final response = await _dio.post(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+        cancelToken: cancelToken,
+      );
+      return _handleResponseWithStringCode<T>(response, fromJson);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// GET 请求（支持字符串类型的 code）
+  Future<ApiResponseWithStringCode<T>> getWithStringCode<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+    T Function(dynamic json)? fromJson,
+  }) async {
+    try {
+      final response = await _dio.get(
+        path,
+        queryParameters: queryParameters,
+        options: options,
+        cancelToken: cancelToken,
+      );
+      return _handleResponseWithStringCode<T>(response, fromJson);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 处理字符串 code 的响应
+  ApiResponseWithStringCode<T> _handleResponseWithStringCode<T>(
+    Response response,
+    T Function(dynamic json)? fromJson,
+  ) {
+    if (response.data is Map<String, dynamic>) {
+      return ApiResponseWithStringCode<T>.fromJson(
+        response.data as Map<String, dynamic>,
+        fromJson,
+      );
+    } else {
+      // 如果响应不是标准格式，创建一个包装的响应
+      return ApiResponseWithStringCode<T>(
+        code: '${response.statusCode ?? 200}',
+        message: 'Success',
+        data: fromJson != null ? fromJson(response.data) : response.data as T?,
+      );
+    }
   }
 }
