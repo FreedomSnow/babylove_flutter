@@ -314,13 +314,20 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           child: ElevatedButton(
             onPressed: _canSendCode ? _sendVerificationCode : null,
             style: ElevatedButton.styleFrom(
+              backgroundColor: _canSendCode ? Colors.blue : Colors.grey,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey,
+              disabledForegroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
             child: Text(
               _canSendCode ? '发送验证码' : '${_countdown}s',
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: 16),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
