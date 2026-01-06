@@ -1,0 +1,21 @@
+{
+  "module": {
+    "name": "entry",
+    "type": "entry",
+    "description": "$string:module_desc",
+    "buildOption": {
+      "arkOptions": {
+        "runtimeOnly": {
+        }
+      }
+    },
+    "targets": [
+      {
+        "name": "default",
+        "applyToProducts": [
+          "default"
+        ]
+      }
+    ]
+  }
+}

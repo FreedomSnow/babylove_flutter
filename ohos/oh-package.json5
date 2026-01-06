@@ -1,0 +1,13 @@
+{
+  "license": "",
+  "devDependencies": {
+    "@ohos/hvigor-ohos-plugin": "5.0.0",
+    "@ohos/hvigor": "5.0.0"
+  },
+  "author": "",
+  "name": "babycare",
+  "description": "BabyLove Flutter - BabyCare Application",
+  "main": "",
+  "version": "1.0.0",
+  "dependencies": {}
+}

@@ -1,0 +1,8 @@
+# HarmonyOS 构建产物
+ohos/.hvigor/
+ohos/build/
+ohos/entry/build/
+ohos/entry/.preview/
+ohos/local.properties
+ohos/node_modules/
+ohos/oh_modules/
