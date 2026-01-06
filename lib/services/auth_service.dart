@@ -110,4 +110,33 @@ class AuthService {
   void setToken(String token) {
     _httpClient.setToken(token);
   }
+
+  /// 提交意见反馈
+  /// 
+  /// 参数：
+  /// - [contact] 联系方式（邮箱、手机号等）
+  /// - [content] 反馈内容
+  /// 
+  /// 返回：提交结果
+  Future<ApiResponseWithStringCode<void>> submitFeedback({
+    required String contact,
+    required String content,
+  }) async {
+    try {
+      final request = {
+        'contact': contact,
+        'content': content,
+      };
+
+      final response = await _httpClient.postWithStringCode<void>(
+        '/api/new-feedback',
+        data: request,
+      );
+
+      return response;
+    } catch (e) {
+      // 重新抛出异常
+      rethrow;
+    }
+  }
 }
