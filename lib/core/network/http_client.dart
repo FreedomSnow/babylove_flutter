@@ -324,6 +324,52 @@ class HttpClient {
     }
   }
 
+  /// PUT 请求（支持字符串类型的 code）
+  Future<ApiResponseWithStringCode<T>> putWithStringCode<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+    T Function(dynamic json)? fromJson,
+  }) async {
+    try {
+      final response = await _dio.put(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+        cancelToken: cancelToken,
+      );
+      return _handleResponseWithStringCode<T>(response, fromJson);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// DELETE 请求（支持字符串类型的 code）
+  Future<ApiResponseWithStringCode<T>> deleteWithStringCode<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+    T Function(dynamic json)? fromJson,
+  }) async {
+    try {
+      final response = await _dio.delete(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+        cancelToken: cancelToken,
+      );
+      return _handleResponseWithStringCode<T>(response, fromJson);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// 处理字符串 code 的响应
   ApiResponseWithStringCode<T> _handleResponseWithStringCode<T>(
     Response response,
