@@ -1,3 +1,5 @@
+import 'family_model.dart';
+
 /// 家庭成员模型
 class FamilyMember {
   final String id;
@@ -6,6 +8,7 @@ class FamilyMember {
   final String role;
   final String nickname;
   final String status;
+  final String? avatarUrl;
 
   FamilyMember({
     required this.id,
@@ -14,6 +17,7 @@ class FamilyMember {
     required this.role,
     required this.nickname,
     required this.status,
+    this.avatarUrl,
   });
 
   /// 从 JSON 创建实例
@@ -25,6 +29,7 @@ class FamilyMember {
       role: json['role'] as String? ?? '',
       nickname: json['nickname'] as String? ?? '',
       status: json['status'] as String? ?? '',
+      avatarUrl: json['avatar_url'] as String?,
     );
   }
 
@@ -37,12 +42,13 @@ class FamilyMember {
       'role': role,
       'nickname': nickname,
       'status': status,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
     };
   }
 
   @override
   String toString() {
-    return 'FamilyMember(id: $id, familyId: $familyId, userId: $userId, role: $role, nickname: $nickname, status: $status)';
+    return 'FamilyMember(id: $id, familyId: $familyId, userId: $userId, role: $role, nickname: $nickname, status: $status, avatarUrl: $avatarUrl)';
   }
 }
 

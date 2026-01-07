@@ -7,6 +7,8 @@ class StorageService {
   StorageService._internal();
 
   static const String _tokenKey = 'auth_token';
+  static const String _themeKey = 'app_theme';
+  static const String _elderModeKey = 'elder_mode';
   SharedPreferences? _prefs;
 
   /// 初始化服务
@@ -36,5 +38,29 @@ class StorageService {
   Future<bool> clearAll() async {
     if (_prefs == null) await init();
     return await _prefs!.clear();
+  }
+
+  /// 保存主题
+  Future<bool> saveTheme(int themeIndex) async {
+    if (_prefs == null) await init();
+    return await _prefs!.setInt(_themeKey, themeIndex);
+  }
+
+  /// 获取主题
+  Future<int?> getTheme() async {
+    if (_prefs == null) await init();
+    return _prefs!.getInt(_themeKey);
+  }
+
+  /// 保存老年模式
+  Future<bool> saveElderMode(bool enabled) async {
+    if (_prefs == null) await init();
+    return await _prefs!.setBool(_elderModeKey, enabled);
+  }
+
+  /// 获取老年模式
+  Future<bool> getElderMode() async {
+    if (_prefs == null) await init();
+    return _prefs!.getBool(_elderModeKey) ?? false;
   }
 }

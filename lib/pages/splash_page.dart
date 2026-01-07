@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:babylove_flutter/services/auth_service.dart';
 import 'package:babylove_flutter/services/storage_service.dart';
 import 'login_page.dart';
-import 'home_page.dart';
+import 'main_page.dart';
 
 /// 启动页（Splash Page）
 /// 用于检查用户登录状态
@@ -68,7 +68,7 @@ class _SplashPageState extends State<SplashPage> {
   void _navigateToHome() {
     if (mounted) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomePage()),
+        MaterialPageRoute(builder: (context) => const MainPage()),
       );
     }
   }

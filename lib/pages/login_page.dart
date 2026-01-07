@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:babylove_flutter/services/auth_service.dart';
 import 'package:babylove_flutter/services/storage_service.dart';
 import 'package:babylove_flutter/core/network/network_exception.dart';
-import 'home_page.dart';
+import 'main_page.dart';
 import 'legal_document_page.dart';
 
 /// 登录页面
@@ -14,18 +14,21 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
+class _LoginPageState extends State<LoginPage>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _codeController = TextEditingController();
+  final _codeFocusNode = FocusNode();
   final _authService = AuthService();
-  
+
   bool _isAgreed = false;
   bool _isLoading = false;
   bool _canSendCode = true;
   int _countdown = 60;
   Timer? _timer;
-  
+  String? _receivedCode; // 接收到的验证码
+
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
 
@@ -36,15 +39,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
-    _shakeAnimation = Tween<double>(begin: 0, end: 10)
-        .chain(CurveTween(curve: Curves.elasticIn))
-        .animate(_shakeController);
+    _shakeAnimation = Tween<double>(
+      begin: 0,
+      end: 10,
+    ).chain(CurveTween(curve: Curves.elasticIn)).animate(_shakeController);
   }
 
   @override
   void dispose() {
     _phoneController.dispose();
     _codeController.dispose();
+    _codeFocusNode.dispose();
     _timer?.cancel();
     _shakeController.dispose();
     super.dispose();
@@ -53,7 +58,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   /// 发送验证码
   Future<void> _sendVerificationCode() async {
     if (!_canSendCode) return;
-    
+
     // 验证手机号
     final phone = _phoneController.text.trim();
     if (phone.isEmpty || !_isValidPhone(phone)) {
@@ -81,13 +86,20 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     try {
       // 调用发送验证码的 API
       final response = await _authService.sendSmsCode(phone: phone);
-      
+
       if (response.isSuccess) {
         // 开发环境会返回验证码
         if (response.data?.code != null) {
+          setState(() {
+            _receivedCode = response.data!.code;
+          });
           _showSnackBar('验证码已发送: ${response.data!.code}', Colors.green);
+          // 自动聚焦验证码输入框,弹出键盘
+          _codeFocusNode.requestFocus();
         } else {
           _showSnackBar('验证码已发送', Colors.green);
+          // 即使没有返回验证码也聚焦输入框
+          _codeFocusNode.requestFocus();
         }
       } else {
         _showSnackBar('发送失败: ${response.message}', Colors.red);
@@ -141,6 +153,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         nickname: '',
       );
 
+      debugPrint('Login response: $response');
       if (response.isSuccess && response.data != null) {
         // 保存 token 到本地
         await StorageService().saveToken(response.data!.token);
@@ -148,7 +161,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         // 跳转到主页
         if (mounted) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomePage()),
+            MaterialPageRoute(builder: (context) => const MainPage()),
           );
         }
       } else {
@@ -185,41 +198,50 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                const SizedBox(height: 60),
-                
-                // 应用图标和名称
-                _buildAppHeader(),
-                
-                const SizedBox(height: 60),
-                
-                // 手机号输入
-                _buildPhoneInput(),
-                
-                const SizedBox(height: 20),
-                
-                // 验证码输入
-                _buildCodeInput(),
-                
-                const SizedBox(height: 30),
-                
-                // 用户协议勾选
-                _buildAgreementCheckbox(),
-                
-                const SizedBox(height: 30),
-                
-                // 登录按钮
-                _buildLoginButton(),
-                
-                const SizedBox(height: 20),
-              ],
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 60),
+
+                      // 应用图标和名称
+                      _buildAppHeader(),
+
+                      const SizedBox(height: 60),
+
+                      // 手机号输入
+                      _buildPhoneInput(),
+
+                      const SizedBox(height: 20),
+
+                      // 验证码输入
+                      _buildCodeInput(),
+
+                      const SizedBox(height: 30),
+
+                      // 用户协议勾选
+                      _buildAgreementCheckbox(),
+
+                      const SizedBox(height: 30),
+
+                      // 登录按钮
+                      _buildLoginButton(),
+
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
+            // 键盘上方的验证码工具栏
+            if (_receivedCode != null && _codeFocusNode.hasFocus)
+              _buildCodeToolbar(),
+          ],
         ),
       ),
     );
@@ -261,9 +283,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         labelText: '手机号',
         hintText: '请输入手机号',
         prefixIcon: const Icon(Icons.phone_android),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         counterText: '',
       ),
       validator: (value) {
@@ -285,6 +305,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         Expanded(
           child: TextFormField(
             controller: _codeController,
+            focusNode: _codeFocusNode,
             keyboardType: TextInputType.number,
             maxLength: 6,
             decoration: InputDecoration(
@@ -324,7 +345,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               ),
             ),
             child: Text(
-              _canSendCode ? '发送验证码' : '${_countdown}s',
+              _canSendCode ? '获取验证码' : '${_countdown}s',
               style: const TextStyle(fontSize: 16),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -332,6 +353,84 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           ),
         ),
       ],
+    );
+  }
+
+  /// 验证码工具栏(显示在键盘上方)
+  Widget _buildCodeToolbar() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        border: Border(top: BorderSide(color: Colors.grey.shade300)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          const Icon(Icons.vpn_key, size: 20, color: Colors.blue),
+          const SizedBox(width: 8),
+          const Text(
+            '收到验证码:',
+            style: TextStyle(fontSize: 14, color: Colors.black87),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                // 点击验证码自动填入
+                _codeController.text = _receivedCode!;
+                setState(() {
+                  _receivedCode = null; // 填入后隐藏工具栏
+                });
+                _codeFocusNode.unfocus(); // 关闭键盘
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _receivedCode!,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.arrow_forward,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          IconButton(
+            icon: const Icon(Icons.close, size: 22),
+            onPressed: () {
+              setState(() {
+                _receivedCode = null;
+              });
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            color: Colors.grey.shade600,
+          ),
+        ],
+      ),
     );
   }
 
@@ -433,10 +532,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               )
             : const Text(
                 '登录',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
       ),
     );

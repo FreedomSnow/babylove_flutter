@@ -1,6 +1,7 @@
 import 'package:babylove_flutter/core/network/network.dart';
 import 'package:babylove_flutter/models/login_response_model.dart';
 import 'package:babylove_flutter/services/storage_service.dart';
+import 'package:flutter/widgets.dart';
 
 /// 认证 API 服务
 class AuthService {
@@ -26,6 +27,7 @@ class AuthService {
         data: request.toJson(),
         fromJson: (json) => SendSmsResponseData.fromJson(json as Map<String, dynamic>),
       );
+      debugPrint('sendSmsCode response: $response');
 
       return response;
     } catch (e) {
@@ -66,10 +68,12 @@ class AuthService {
         // 同时保存到本地存储
         await _storageService.saveToken(response.data!.token);
       }
+      debugPrint('loginWithSms response: $response');
 
       return response;
     } catch (e) {
       // 重新抛出异常
+      debugPrint('loginWithSms error: $e');
       rethrow;
     }
   }
