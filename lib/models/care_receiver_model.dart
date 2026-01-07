@@ -21,11 +21,7 @@ class EmergencyContact {
 
   /// 转换为 JSON
   Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'phone': phone,
-      'relation': relation,
-    };
+    return {'name': name, 'phone': phone, 'relation': relation};
   }
 
   @override
@@ -103,23 +99,27 @@ class CareReceiver {
   /// 从 JSON 创建实例
   factory CareReceiver.fromJson(Map<String, dynamic> json) {
     return CareReceiver(
-      id: json['id'] as String? ?? '',
+      id: json['id']?.toString() ?? '',
       name: json['name'] as String? ?? '',
-      gender: json['gender'] as String?,
+      gender: json['gender']?.toString(),
       birthDate: json['birth_date'] as int?,
       avatar: json['avatar'] as String?,
       residence: json['residence'] as String?,
       phone: json['phone'] as String?,
       emergencyContact: json['emergency_contact'] != null
-          ? EmergencyContact.fromJson(json['emergency_contact'] as Map<String, dynamic>)
+          ? EmergencyContact.fromJson(
+              json['emergency_contact'] as Map<String, dynamic>,
+            )
           : null,
       medicalHistory: json['medical_history'] as String?,
       allergies: json['allergies'] as String?,
       remark: json['remark'] as String?,
       customFields: json['custom_fields'] != null
           ? (json['custom_fields'] as List)
-              .map((item) => CustomField.fromJson(item as Map<String, dynamic>))
-              .toList()
+                .map(
+                  (item) => CustomField.fromJson(item as Map<String, dynamic>),
+                )
+                .toList()
           : null,
     );
   }
@@ -134,7 +134,8 @@ class CareReceiver {
       if (avatar != null) 'avatar': avatar,
       if (residence != null) 'residence': residence,
       if (phone != null) 'phone': phone,
-      if (emergencyContact != null) 'emergency_contact': emergencyContact!.toJson(),
+      if (emergencyContact != null)
+        'emergency_contact': emergencyContact!.toJson(),
       if (medicalHistory != null) 'medical_history': medicalHistory,
       if (allergies != null) 'allergies': allergies,
       if (remark != null) 'remark': remark,
