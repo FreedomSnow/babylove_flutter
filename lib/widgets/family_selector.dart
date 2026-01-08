@@ -90,8 +90,8 @@ class _FamilySelectorState extends State<FamilySelector> {
                     : null,
               ),
               title: Text(family.name),
-              trailing: isSelected
-                  ? const Icon(Icons.check, color: Colors.green)
+                trailing: isSelected
+                  ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                   : null,
               selected: isSelected,
               onTap: () {
@@ -153,8 +153,8 @@ class _FamilySelectorState extends State<FamilySelector> {
                     ? '${DateTime.fromMillisecondsSinceEpoch(careReceiver.birthDate! * 1000).year}年${DateTime.fromMillisecondsSinceEpoch(careReceiver.birthDate! * 1000).month}月'
                     : '',
               ),
-              trailing: isSelected
-                  ? const Icon(Icons.check, color: Colors.green)
+                trailing: isSelected
+                  ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                   : null,
               selected: isSelected,
               onTap: () {
@@ -180,8 +180,13 @@ class _FamilySelectorState extends State<FamilySelector> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withOpacity(0.05),
-        border: Border(bottom: BorderSide(color: Colors.grey[300]!, width: 1)),
+        color: Theme.of(context).colorScheme.primary.withOpacity(0.06),
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).dividerTheme.color ?? Theme.of(context).colorScheme.outlineVariant,
+            width: 1,
+          ),
+        ),
       ),
       child: Row(
         children: [
@@ -196,9 +201,11 @@ class _FamilySelectorState extends State<FamilySelector> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
+                  border: Border.all(
+                    color: Theme.of(context).dividerTheme.color ?? Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -233,9 +240,11 @@ class _FamilySelectorState extends State<FamilySelector> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
+                  border: Border.all(
+                    color: Theme.of(context).dividerTheme.color ?? Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,

@@ -2,9 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:babylove_flutter/services/auth_service.dart';
 import 'package:babylove_flutter/services/storage_service.dart';
+import 'package:babylove_flutter/services/app_state_service.dart';
 import 'package:babylove_flutter/core/network/network_exception.dart';
 import 'main_page.dart';
 import 'legal_document_page.dart';
+import 'welcome_page.dart';
 
 /// 登录页面
 class LoginPage extends StatefulWidget {
@@ -62,7 +64,7 @@ class _LoginPageState extends State<LoginPage>
     // 验证手机号
     final phone = _phoneController.text.trim();
     if (phone.isEmpty || !_isValidPhone(phone)) {
-      _showSnackBar('请输入正确的手机号', Colors.red);
+      _showSnackBar('请输入正确的手机号', Theme.of(context).colorScheme.error);
       return;
     }
 
@@ -93,16 +95,16 @@ class _LoginPageState extends State<LoginPage>
           setState(() {
             _receivedCode = response.data!.code;
           });
-          _showSnackBar('验证码已发送: ${response.data!.code}', Colors.green);
+          // _showSnackBar('验证码已发送: ${response.data!.code}', Colors.green);
           // 自动聚焦验证码输入框,弹出键盘
           _codeFocusNode.requestFocus();
         } else {
-          _showSnackBar('验证码已发送', Colors.green);
+          _showSnackBar('验证码已发送', Theme.of(context).colorScheme.primary);
           // 即使没有返回验证码也聚焦输入框
           _codeFocusNode.requestFocus();
         }
       } else {
-        _showSnackBar('发送失败: ${response.message}', Colors.red);
+        _showSnackBar('发送失败: ${response.message}', Theme.of(context).colorScheme.error);
         // 发送失败时重置倒计时
         _timer?.cancel();
         setState(() {
@@ -110,7 +112,7 @@ class _LoginPageState extends State<LoginPage>
         });
       }
     } catch (e) {
-      _showSnackBar('发送失败: $e', Colors.red);
+      _showSnackBar('发送失败: $e', Theme.of(context).colorScheme.error);
       // 发送失败时重置倒计时
       _timer?.cancel();
       setState(() {
@@ -129,7 +131,7 @@ class _LoginPageState extends State<LoginPage>
     // 检查是否同意协议
     if (!_isAgreed) {
       _shakeController.forward(from: 0);
-      _showSnackBar('请先同意用户协议和隐私政策', Colors.orange);
+      _showSnackBar('请先同意用户协议和隐私政策', Theme.of(context).colorScheme.error);
       return;
     }
 
@@ -158,19 +160,35 @@ class _LoginPageState extends State<LoginPage>
         // 保存 token 到本地
         await StorageService().saveToken(response.data!.token);
 
-        // 跳转到主页
+        // 保存用户数据到全局状态
+        final appState = AppStateService();
+        appState.updateLoginData(
+          user: response.data!.user,
+          lastFamily: response.data!.lastFamily,
+          lastCareReceiver: response.data!.lastCareReceiver,
+        );
+
+        // 根据是否有家庭和护理对象决定跳转页面
         if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const MainPage()),
-          );
+          if (!appState.hasCompletedSetup) {
+            // 已有家庭和护理对象，跳转到主页
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const MainPage()),
+            );
+          } else {
+            // 没有家庭或护理对象，跳转到欢迎页
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const WelcomePage()),
+            );
+          }
         }
       } else {
-        _showSnackBar('登录失败: ${response.message}', Colors.red);
+        _showSnackBar('登录失败: ${response.message}', Theme.of(context).colorScheme.error);
       }
     } on NetworkException catch (e) {
-      _showSnackBar('登录失败: ${e.message}', Colors.red);
+      _showSnackBar('登录失败: ${e.message}', Theme.of(context).colorScheme.error);
     } catch (e) {
-      _showSnackBar('登录失败: $e', Colors.red);
+      _showSnackBar('登录失败: $e', Theme.of(context).colorScheme.error);
     } finally {
       if (mounted) {
         setState(() {
@@ -196,7 +214,6 @@ class _LoginPageState extends State<LoginPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -261,12 +278,12 @@ class _LoginPageState extends State<LoginPage>
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           '幼安管家',
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ],
@@ -332,13 +349,18 @@ class _LoginPageState extends State<LoginPage>
         SizedBox(
           width: 120,
           height: 56,
-          child: ElevatedButton(
+          child: OutlinedButton(
             onPressed: _canSendCode ? _sendVerificationCode : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _canSendCode ? Colors.blue : Colors.grey,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: Colors.grey,
-              disabledForegroundColor: Colors.white,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _canSendCode
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.outline,
+              side: BorderSide(
+                color: _canSendCode
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.outline,
+                width: 1.5,
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -361,17 +383,17 @@ class _LoginPageState extends State<LoginPage>
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        border: Border(top: BorderSide(color: Colors.grey.shade300)),
+        color: Theme.of(context).colorScheme.primary.withOpacity(0.06),
+        border: Border(top: BorderSide(color: Theme.of(context).dividerTheme.color ?? Theme.of(context).colorScheme.outlineVariant)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          const Icon(Icons.vpn_key, size: 20, color: Colors.blue),
+          Icon(Icons.vpn_key, size: 20, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
-          const Text(
+          Text(
             '收到验证码:',
-            style: TextStyle(fontSize: 14, color: Colors.black87),
+            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -390,7 +412,7 @@ class _LoginPageState extends State<LoginPage>
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.blue,
+                  color: Theme.of(context).colorScheme.primary,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -399,18 +421,18 @@ class _LoginPageState extends State<LoginPage>
                   children: [
                     Text(
                       _receivedCode!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         letterSpacing: 3,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Icon(
+                    Icon(
                       Icons.arrow_forward,
                       size: 18,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onPrimary,
                     ),
                   ],
                 ),
@@ -427,7 +449,7 @@ class _LoginPageState extends State<LoginPage>
             },
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            color: Colors.grey.shade600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ],
       ),
@@ -470,10 +492,10 @@ class _LoginPageState extends State<LoginPage>
                       ),
                     );
                   },
-                  child: const Text(
+                  child: Text(
                     '《用户协议》',
                     style: TextStyle(
-                      color: Colors.blue,
+                      color: Theme.of(context).colorScheme.primary,
                       decoration: TextDecoration.underline,
                     ),
                   ),
@@ -491,10 +513,10 @@ class _LoginPageState extends State<LoginPage>
                       ),
                     );
                   },
-                  child: const Text(
+                  child: Text(
                     '《隐私政策》',
                     style: TextStyle(
-                      color: Colors.blue,
+                      color: Theme.of(context).colorScheme.primary,
                       decoration: TextDecoration.underline,
                     ),
                   ),
@@ -515,8 +537,7 @@ class _LoginPageState extends State<LoginPage>
       child: ElevatedButton(
         onPressed: _isLoading ? null : _handleLogin,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
+          elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -525,10 +546,7 @@ class _LoginPageState extends State<LoginPage>
             ? const SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2),
               )
             : const Text(
                 '登录',

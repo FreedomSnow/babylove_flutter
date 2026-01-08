@@ -68,7 +68,6 @@ class AuthService {
         // 同时保存到本地存储
         await _storageService.saveToken(response.data!.token);
       }
-      debugPrint('loginWithSms response: $response');
 
       return response;
     } catch (e) {
