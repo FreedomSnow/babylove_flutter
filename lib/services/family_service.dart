@@ -2,6 +2,7 @@ import 'package:babylove_flutter/core/network/network.dart';
 import 'package:babylove_flutter/models/family_model.dart';
 import 'package:babylove_flutter/models/family_member_model.dart';
 import 'package:babylove_flutter/models/care_receiver_model.dart';
+import 'package:flutter/material.dart';
 
 /// 家庭 API 服务
 class FamilyService {
@@ -27,6 +28,8 @@ class FamilyService {
       return response;
     } catch (e) {
       // 重新抛出异常
+      debugPrint('Error in getMyFamilies: $e');
+      
       rethrow;
     }
   }
@@ -413,17 +416,18 @@ class FamilyService {
   }
 
   /// 获取家庭列表（Mock 数据版本，用于UI测试）
-  Future<List<FamilyModel>> getFamilies() async {
+  Future<List<Family>> getFamilies() async {
     // 模拟网络延迟
     await Future.delayed(const Duration(milliseconds: 500));
 
     // 返回 Mock 数据
     return [
-      FamilyModel(
+      Family(
         id: 'family_1',
         name: '张家大院',
-        avatarUrl: null,
-        careReceivers: [
+        avatar: null,
+        status: '',
+        careReceiversParam: [
           CareReceiver(
             id: 'care_receiver_1',
             name: '外婆',
@@ -439,7 +443,7 @@ class FamilyService {
             avatar: null,
           ),
         ],
-        members: [
+        membersParam: [
           FamilyMember(
             id: 'member_1',
             familyId: 'family_1',
@@ -459,13 +463,13 @@ class FamilyService {
             avatarUrl: null,
           ),
         ],
-        createdAt: DateTime(2023, 1, 1),
       ),
-      FamilyModel(
+      Family(
         id: 'family_2',
         name: '李家小院',
-        avatarUrl: null,
-        careReceivers: [
+        avatar: null,
+        status: '',
+        careReceiversParam: [
           CareReceiver(
             id: 'care_receiver_3',
             name: '奶奶',
@@ -474,7 +478,7 @@ class FamilyService {
             avatar: null,
           ),
         ],
-        members: [
+        membersParam: [
           FamilyMember(
             id: 'member_3',
             familyId: 'family_2',
@@ -485,7 +489,6 @@ class FamilyService {
             avatarUrl: null,
           ),
         ],
-        createdAt: DateTime(2023, 6, 1),
       ),
     ];
   }

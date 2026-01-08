@@ -149,7 +149,16 @@ class _TodoPageState extends State<TodoPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('待办'),
+        title: Consumer<AppStateProvider>(
+          builder: (context, appState, child) {
+            return FamilySelector(
+              onChanged: () {
+                _loadTodos();
+              },
+            );
+          },
+        ),
+        toolbarHeight: 76,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -160,17 +169,6 @@ class _TodoPageState extends State<TodoPage> {
       ),
       body: Column(
         children: [
-          // 家庭和被照顾者选择器
-          Consumer<AppStateProvider>(
-            builder: (context, appState, child) {
-              return FamilySelector(
-                onChanged: () {
-                  _loadTodos();
-                },
-              );
-            },
-          ),
-          
           // 日期选择器
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

@@ -170,7 +170,7 @@ class _LoginPageState extends State<LoginPage>
 
         // 根据是否有家庭和护理对象决定跳转页面
         if (mounted) {
-          if (!appState.hasCompletedSetup) {
+          if (appState.hasCompletedSetup) {
             // 已有家庭和护理对象，跳转到主页
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (context) => const MainPage()),
