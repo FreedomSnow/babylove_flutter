@@ -190,6 +190,19 @@ class CareReceiverService {
     try {
       // 构建请求数据，包含家庭信息和被照顾者信息
       final careReceiverJson = careReceiver.toJson();
+
+      // 移除 id，后端创建时不需要客户端提供
+      careReceiverJson.remove('id');
+
+      // 将 gender 字段从字符串映射为后端需要的 int（约定：male=1, female=2）
+      if (careReceiver.gender != null) {
+        careReceiverJson['gender'] = _mapGenderToInt(careReceiver.gender);
+      }
+
+      // birth_date 转为 UTC 毫秒时间戳
+      if (careReceiver.birthDate != null) {
+        careReceiverJson['birth_date'] = careReceiver.birthDate! * 1000;
+      }
       
       final request = {
         'family_name': familyName,
@@ -209,6 +222,17 @@ class CareReceiverService {
     } catch (e) {
       // 重新抛出异常
       rethrow;
+    }
+  }
+
+  int? _mapGenderToInt(String? gender) {
+    switch (gender) {
+      case 'male':
+        return 1;
+      case 'female':
+        return 2;
+      default:
+        return null;
     }
   }
 }

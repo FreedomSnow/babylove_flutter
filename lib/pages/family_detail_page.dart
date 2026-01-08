@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/family_model.dart';
+import '../core/utils.dart';
 
 /// 家庭详情页面
 class FamilyDetailPage extends StatefulWidget {
-  final FamilyModel family;
+  final Family family;
 
   const FamilyDetailPage({super.key, required this.family});
 
@@ -12,35 +13,6 @@ class FamilyDetailPage extends StatefulWidget {
 }
 
 class _FamilyDetailPageState extends State<FamilyDetailPage> {
-  String _getChineseZodiac(DateTime birthDate) {
-    const zodiacAnimals = [
-      '猴',
-      '鸡',
-      '狗',
-      '猪',
-      '鼠',
-      '牛',
-      '虎',
-      '兔',
-      '龙',
-      '蛇',
-      '马',
-      '羊',
-    ];
-    return zodiacAnimals[birthDate.year % 12];
-  }
-
-  String _getGenderText(String gender) {
-    switch (gender) {
-      case 'male':
-        return '男';
-      case 'female':
-        return '女';
-      default:
-        return '未知';
-    }
-  }
-
   String _getRoleText(String role) {
     switch (role) {
       case 'owner':
@@ -75,10 +47,10 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                 children: [
                   CircleAvatar(
                     radius: 40,
-                    backgroundImage: widget.family.avatarUrl != null
-                        ? NetworkImage(widget.family.avatarUrl!)
+                    backgroundImage: widget.family.avatar != null
+                        ? NetworkImage(widget.family.avatar!)
                         : null,
-                    child: widget.family.avatarUrl == null
+                    child: widget.family.avatar == null
                         ? const Icon(Icons.family_restroom, size: 40)
                         : null,
                   ),
@@ -94,14 +66,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '创建于 ${widget.family.createdAt.year}年${widget.family.createdAt.month}月',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
+                        // 创建时间由后端模型暂不提供，此处不展示
                       ],
                     ),
                   ),
@@ -174,9 +139,14 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      '${careReceiver.birthDate != null ? DateTime.fromMillisecondsSinceEpoch(careReceiver.birthDate! * 1000).year : ''}年${careReceiver.birthDate != null ? DateTime.fromMillisecondsSinceEpoch(careReceiver.birthDate! * 1000).month : ''}月 · '
-                      '${careReceiver.birthDate != null ? _getChineseZodiac(DateTime.fromMillisecondsSinceEpoch(careReceiver.birthDate! * 1000)) : ''} · '
-                      '${_getGenderText(careReceiver.gender ?? 'unknown')}',
+                      AppUtils.buildCareReceiverInfo(
+                        birthDate: careReceiver.birthDate != null
+                            ? DateTime.fromMillisecondsSinceEpoch(
+                                careReceiver.birthDate! * 1000,
+                              )
+                            : null,
+                        gender: careReceiver.gender,
+                      ),
                       style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     ),
                   ),
@@ -188,7 +158,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                   },
                 ),
               );
-            }).toList(),
+            }),
 
           const SizedBox(height: 24),
 
@@ -250,7 +220,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                   ),
                 ),
               );
-            }).toList(),
+            }),
         ],
       ),
     );

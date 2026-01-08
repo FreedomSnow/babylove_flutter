@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/family_model.dart';
 import '../models/care_receiver_model.dart';
-import '../services/family_service.dart';
+import '../services/app_state_service.dart';
 import '../providers/app_state_provider.dart';
 
 /// 家庭和被照顾者选择器组件
@@ -17,56 +17,53 @@ class FamilySelector extends StatefulWidget {
 }
 
 class _FamilySelectorState extends State<FamilySelector> {
-  final FamilyService _familyService = FamilyService();
-  List<FamilyModel> _families = [];
-  FamilyModel? _currentFamily;
+  final AppStateService _appState = AppStateService();
+  List<Family> _families = [];
+  Family? _currentFamily;
   CareReceiver? _currentCareReceiver;
+  late final VoidCallback _appStateListener;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _appStateListener = _onAppStateChanged;
+    _appState.addListener(_appStateListener);
+    _syncFromState(notifyProvider: true);
   }
 
-  Future<void> _loadData() async {
-    try {
-      _families = await _familyService.getFamilies();
-      if (_families.isNotEmpty) {
-        final appState = context.read<AppStateProvider>();
+  void _onAppStateChanged() {
+    _syncFromState(notifyProvider: true);
+  }
 
-        // 获取当前家庭
-        if (appState.currentFamilyId != null) {
-          _currentFamily = _families.firstWhere(
-            (f) => f.id == appState.currentFamilyId,
-            orElse: () => _families.first,
-          );
-        } else {
-          _currentFamily = _families.first;
-          appState.setCurrentFamily(_currentFamily!.id);
-        }
+  void _syncFromState({bool notifyProvider = false}) {
+    final families = _appState.myFamilies;
+    final lastFamily = _appState.lastFamily;
+    final lastCareReceiver = _appState.lastCareReceiver;
 
-        // 获取当前被照顾者
-        if (_currentFamily!.careReceivers.isNotEmpty) {
-          if (appState.currentCareReceiverId != null) {
-            _currentCareReceiver = _currentFamily!.careReceivers.firstWhere(
-              (cr) => cr.id == appState.currentCareReceiverId,
-              orElse: () => _currentFamily!.careReceivers.first,
-            );
-          } else {
-            _currentCareReceiver = _currentFamily!.careReceivers.first;
-            appState.setCurrentCareReceiver(_currentCareReceiver!.id);
-          }
-        }
+    setState(() {
+      _families = families;
+      _currentFamily =
+          lastFamily ?? (families.isNotEmpty ? families.first : null);
+      _currentCareReceiver =
+          lastCareReceiver ??
+          (_currentFamily != null && _currentFamily!.careReceivers.isNotEmpty
+              ? _currentFamily!.careReceivers.first
+              : null);
+    });
 
-        setState(() {});
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('加载数据失败: $e')));
-      }
+    if (notifyProvider && _currentFamily != null) {
+      final provider = context.read<AppStateProvider>();
+      provider.updateFamilyAndCareReceiver(
+        _currentFamily!.id,
+        _currentCareReceiver?.id,
+      );
     }
+  }
+
+  @override
+  void dispose() {
+    _appState.removeListener(_appStateListener);
+    super.dispose();
   }
 
   void _showFamilyPicker() {
@@ -82,30 +79,39 @@ class _FamilySelectorState extends State<FamilySelector> {
 
             return ListTile(
               leading: CircleAvatar(
-                backgroundImage: family.avatarUrl != null
-                    ? NetworkImage(family.avatarUrl!)
+                backgroundImage: family.avatar != null
+                    ? NetworkImage(family.avatar!)
                     : null,
-                child: family.avatarUrl == null
+                child: family.avatar == null
                     ? const Icon(Icons.family_restroom)
                     : null,
               ),
               title: Text(family.name),
               trailing: isSelected
-                  ? const Icon(Icons.check, color: Colors.green)
+                  ? Icon(
+                      Icons.check,
+                      color: Theme.of(context).colorScheme.primary,
+                    )
                   : null,
               selected: isSelected,
               onTap: () {
+                // 更新全局状态服务
+                _appState.setLastFamily(family);
+                if (family.careReceivers.isNotEmpty) {
+                  _appState.setLastCareReceiver(family.careReceivers.first);
+                } else {
+                  _appState.setLastCareReceiver(null);
+                }
+
+                // 本地 UI 状态
                 setState(() {
-                  _currentFamily = family;
-                  if (family.careReceivers.isNotEmpty) {
-                    _currentCareReceiver = family.careReceivers.first;
-                  } else {
-                    _currentCareReceiver = null;
-                  }
+                  _currentFamily = _appState.lastFamily;
+                  _currentCareReceiver = _appState.lastCareReceiver;
                 });
 
-                final appState = context.read<AppStateProvider>();
-                appState.updateFamilyAndCareReceiver(
+                // 通知 Provider（供全局监听者使用）
+                final provider = context.read<AppStateProvider>();
+                provider.updateFamilyAndCareReceiver(
                   _currentFamily!.id,
                   _currentCareReceiver?.id,
                 );
@@ -154,16 +160,27 @@ class _FamilySelectorState extends State<FamilySelector> {
                     : '',
               ),
               trailing: isSelected
-                  ? const Icon(Icons.check, color: Colors.green)
+                  ? Icon(
+                      Icons.check,
+                      color: Theme.of(context).colorScheme.primary,
+                    )
                   : null,
               selected: isSelected,
               onTap: () {
+                // 更新全局状态服务
+                _appState.setLastCareReceiver(careReceiver);
+
+                // 本地 UI 状态
                 setState(() {
-                  _currentCareReceiver = careReceiver;
+                  _currentCareReceiver = _appState.lastCareReceiver;
                 });
 
-                final appState = context.read<AppStateProvider>();
-                appState.setCurrentCareReceiver(_currentCareReceiver!.id);
+                // 通知 Provider（供全局监听者使用）
+                final provider = context.read<AppStateProvider>();
+                provider.updateFamilyAndCareReceiver(
+                  (_appState.lastFamily?.id) ?? _currentFamily!.id,
+                  _currentCareReceiver?.id,
+                );
 
                 Navigator.pop(context);
                 widget.onChanged?.call();
@@ -177,11 +194,13 @@ class _FamilySelectorState extends State<FamilySelector> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withOpacity(0.05),
-        border: Border(bottom: BorderSide(color: Colors.grey[300]!, width: 1)),
+        color: primaryColor.withValues(alpha: 0.06),
       ),
       child: Row(
         children: [
@@ -196,24 +215,28 @@ class _FamilySelectorState extends State<FamilySelector> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
+                  border: Border.all(
+                    color:
+                        theme.dividerTheme.color ??
+                        theme.colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.family_restroom, size: 20),
+                    Icon(Icons.family_restroom, size: 20, color: primaryColor),
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
                         _currentFamily?.name ?? '选择家庭',
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 14, color: primaryColor),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down, size: 20),
+                    Icon(Icons.arrow_drop_down, size: 20, color: primaryColor),
                   ],
                 ),
               ),
@@ -233,24 +256,28 @@ class _FamilySelectorState extends State<FamilySelector> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
+                  border: Border.all(
+                    color:
+                        theme.dividerTheme.color ??
+                        theme.colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.person, size: 20),
+                    Icon(Icons.person, size: 20, color: primaryColor),
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
                         _currentCareReceiver?.name ?? '选择被照顾者',
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 14, color: primaryColor),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down, size: 20),
+                    Icon(Icons.arrow_drop_down, size: 20, color: primaryColor),
                   ],
                 ),
               ),

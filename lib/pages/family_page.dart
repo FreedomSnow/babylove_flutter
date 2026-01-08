@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import '../models/family_model.dart';
 import '../models/care_receiver_model.dart';
 import '../services/family_service.dart';
+import '../services/app_state_service.dart';
 import '../providers/app_state_provider.dart';
 import '../widgets/family_selector.dart';
+import '../core/utils.dart';
 import 'family_detail_page.dart';
 
 /// 家庭页面
@@ -17,167 +19,176 @@ class FamilyPage extends StatefulWidget {
 
 class _FamilyPageState extends State<FamilyPage> {
   final FamilyService _familyService = FamilyService();
-  List<FamilyModel> _families = [];
-  bool _isLoading = false;
+  final AppStateService _appState = AppStateService();
+  List<Family> _families = [];
+  final bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadFamilies();
+    _loadFamiliesFromState();
   }
 
-  Future<void> _loadFamilies() async {
-    setState(() => _isLoading = true);
+  void _loadFamiliesFromState() {
+    setState(() {
+      _families = _appState.myFamilies;
+    });
+  }
+
+  Future<void> _refreshFamilies() async {
     try {
-      _families = await _familyService.getFamilies();
-      setState(() => _isLoading = false);
+      final resp = await _familyService.getMyFamilies();
+      if (resp.isSuccess) {
+        _appState.setMyFamilies(resp.data ?? []);
+        setState(() {
+          _families = _appState.myFamilies;
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('刷新失败: ${resp.message ?? '未知错误'}')),
+          );
+        }
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('加载家庭失败: $e')));
+        ).showSnackBar(SnackBar(content: Text('刷新失败: $e')));
       }
-    }
-  }
-
-  String _getChineseZodiac(DateTime birthDate) {
-    const zodiacAnimals = [
-      '猴',
-      '鸡',
-      '狗',
-      '猪',
-      '鼠',
-      '牛',
-      '虎',
-      '兔',
-      '龙',
-      '蛇',
-      '马',
-      '羊',
-    ];
-    return zodiacAnimals[birthDate.year % 12];
-  }
-
-  String _getGenderText(String gender) {
-    switch (gender) {
-      case 'male':
-        return '男';
-      case 'female':
-        return '女';
-      default:
-        return '未知';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('家庭')),
-      body: Column(
+      appBar: AppBar(
+        title: Consumer<AppStateProvider>(
+          builder: (context, appState, child) {
+            return FamilySelector(
+              onChanged: () {
+                // 选择器变更后,直接从全局状态刷新本地列表
+                _loadFamiliesFromState();
+              },
+            );
+          },
+        ),
+        toolbarHeight: 68,
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refreshFamilies,
+        child: _buildListContent(),
+      ),
+    );
+  }
+
+  Widget _buildListContent() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_families.isEmpty) {
+      // 也使用可滚动容器以支持下拉刷新
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
         children: [
-          // 家庭和被照顾者选择器
-          Consumer<AppStateProvider>(
-            builder: (context, appState, child) {
-              return FamilySelector(
-                onChanged: () {
-                  setState(() {});
-                },
-              );
-            },
-          ),
-
-          // 家庭列表
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _families.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.family_restroom,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          '暂无家庭',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : Consumer<AppStateProvider>(
-                    builder: (context, appState, child) {
-                      return ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _families.length,
-                        itemBuilder: (context, index) {
-                          final family = _families[index];
-                          final isCurrentFamily =
-                              family.id == appState.currentFamilyId;
-                          final currentCareReceiver = family.careReceivers
-                              .firstWhere(
-                                (cr) => cr.id == appState.currentCareReceiverId,
-                                orElse: () => family.careReceivers.isNotEmpty
-                                    ? family.careReceivers.first
-                                    : CareReceiver(
-                                        id: '',
-                                        name: '无',
-                                        gender: 'unknown',
-                                        birthDate: null,
-                                      ),
-                              );
-
-                          return _FamilyCard(
-                            family: family,
-                            currentCareReceiver: currentCareReceiver,
-                            isCurrentFamily: isCurrentFamily,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      FamilyDetailPage(family: family),
-                                ),
-                              ).then((_) => _loadFamilies());
-                            },
-                            getChineseZodiac: _getChineseZodiac,
-                            getGenderText: _getGenderText,
-                          );
-                        },
-                      );
-                    },
+          SizedBox(
+            height: 280,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.family_restroom,
+                    size: 64,
+                    color: Colors.grey[400],
                   ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '暂无家庭',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
-      ),
+      );
+    }
+
+    final lastFamily = _appState.lastFamily;
+    final lastCareReceiver = _appState.lastCareReceiver;
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: _families.length,
+      itemBuilder: (context, index) {
+        final family = _families[index];
+        final isCurrentFamily =
+            lastFamily != null && family.id == lastFamily.id;
+
+        // 当前被照顾者：当前家庭显示 AppState 的最近护理对象，否则展示该家庭的首个
+        final CareReceiver currentCareReceiver = isCurrentFamily
+            ? (lastCareReceiver ??
+                  (family.careReceivers.isNotEmpty
+                      ? family.careReceivers.first
+                      : CareReceiver(
+                          id: '',
+                          name: '无',
+                          gender: 'unknown',
+                          birthDate: null,
+                        )))
+            : (family.careReceivers.isNotEmpty
+                  ? family.careReceivers.first
+                  : CareReceiver(
+                      id: '',
+                      name: '无',
+                      gender: 'unknown',
+                      birthDate: null,
+                    ));
+
+        return _FamilyCard(
+          family: family,
+          currentCareReceiver: currentCareReceiver,
+          isCurrentFamily: isCurrentFamily,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => FamilyDetailPage(family: family),
+              ),
+            ).then((_) => _loadFamiliesFromState());
+          },
+        );
+      },
     );
   }
 }
 
 /// 家庭卡片组件
 class _FamilyCard extends StatelessWidget {
-  final FamilyModel family;
+  final Family family;
   final CareReceiver currentCareReceiver;
   final bool isCurrentFamily;
   final VoidCallback onTap;
-  final String Function(DateTime) getChineseZodiac;
-  final String Function(String) getGenderText;
 
   const _FamilyCard({
     required this.family,
     required this.currentCareReceiver,
     required this.isCurrentFamily,
     required this.onTap,
-    required this.getChineseZodiac,
-    required this.getGenderText,
   });
+
+  String _buildCareReceiverInfo(CareReceiver careReceiver) {
+    return AppUtils.buildCareReceiverInfo(
+      birthDate: careReceiver.birthDate != null
+          ? DateTime.fromMillisecondsSinceEpoch(careReceiver.birthDate! * 1000)
+          : null,
+      gender: careReceiver.gender,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -204,10 +215,10 @@ class _FamilyCard extends StatelessWidget {
                   // 家庭头像
                   CircleAvatar(
                     radius: 30,
-                    backgroundImage: family.avatarUrl != null
-                        ? NetworkImage(family.avatarUrl!)
+                    backgroundImage: family.avatar != null
+                        ? NetworkImage(family.avatar!)
                         : null,
-                    child: family.avatarUrl == null
+                    child: family.avatar == null
                         ? const Icon(Icons.family_restroom, size: 30)
                         : null,
                   ),
@@ -242,7 +253,7 @@ class _FamilyCard extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Text(
-                                  '当前',
+                                  '选中',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -254,7 +265,7 @@ class _FamilyCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${family.careReceivers.length}位被照顾者 · ${family.members.length}位成员',
+                          '${family.careReceiverIds.length}位被照顾者 · ${family.memberCount}位成员',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[600],
@@ -268,7 +279,7 @@ class _FamilyCard extends StatelessWidget {
                 ],
               ),
 
-              if (family.careReceivers.isNotEmpty) ...[
+              if (family.lastCareReceiver != null) ...[
                 const Divider(height: 24),
 
                 // 当前被照顾者信息
@@ -303,31 +314,31 @@ class _FamilyCard extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '当前照顾者',
-                                  style: TextStyle(
-                                    color: Colors.blue[700],
-                                    fontSize: 11,
+                              if (isCurrentFamily) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[50],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '当前照顾者',
+                                    style: TextStyle(
+                                      color: Colors.blue[700],
+                                      fontSize: 11,
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${currentCareReceiver.birthDate != null ? DateTime.fromMillisecondsSinceEpoch(currentCareReceiver.birthDate! * 1000).year : ''}年${currentCareReceiver.birthDate != null ? DateTime.fromMillisecondsSinceEpoch(currentCareReceiver.birthDate! * 1000).month : ''}月 · '
-                            '${currentCareReceiver.birthDate != null ? getChineseZodiac(DateTime.fromMillisecondsSinceEpoch(currentCareReceiver.birthDate! * 1000)) : ''} · '
-                            '${getGenderText(currentCareReceiver.gender ?? 'unknown')}',
+                            _buildCareReceiverInfo(currentCareReceiver),
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.grey[600],

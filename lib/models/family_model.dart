@@ -11,8 +11,11 @@ class Family {
   final String status;
   final String? creatorId;
   final int? memberCount;
-  final int? createdAt;
-  final int? updatedAt;
+  final List<String> careReceiverIds;
+  // 以下属性不从 JSON 中获取，后期赋值
+  CareReceiver? lastCareReceiver;
+  List<CareReceiver> careReceivers;
+  List<FamilyMember> members;
 
   Family({
     required this.id,
@@ -23,9 +26,14 @@ class Family {
     required this.status,
     this.creatorId,
     this.memberCount,
-    this.createdAt,
-    this.updatedAt,
-  });
+    List<String>? careReceiverIds,
+    CareReceiver? lastCareReceiverParam,
+    List<CareReceiver>? careReceiversParam,
+    List<FamilyMember>? membersParam,
+  }) : careReceiverIds = careReceiverIds ?? [],
+       lastCareReceiver = lastCareReceiverParam,
+       careReceivers = careReceiversParam ?? [],
+       members = membersParam ?? [];
 
   /// 从 JSON 创建实例
   factory Family.fromJson(Map<String, dynamic> json) {
@@ -38,8 +46,9 @@ class Family {
       status: json['status'] as String? ?? '',
       creatorId: json['creator_id']?.toString(),
       memberCount: json['member_count'] as int?,
-      createdAt: json['created_at'] as int?,
-      updatedAt: json['updated_at'] as int?,
+      careReceiverIds: (json['care_receiver_ids'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
     );
   }
 
@@ -54,33 +63,12 @@ class Family {
       'status': status,
       if (creatorId != null) 'creator_id': creatorId,
       if (memberCount != null) 'member_count': memberCount,
-      if (createdAt != null) 'created_at': createdAt,
-      if (updatedAt != null) 'updated_at': updatedAt,
+      'care_receiver_ids': careReceiverIds,
     };
   }
 
   @override
   String toString() {
-    return 'Family(id: $id, name: $name, avatar: $avatar, role: $role, myNickname: $myNickname, status: $status, creatorId: $creatorId, memberCount: $memberCount, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'Family(id: $id, name: $name, avatar: $avatar, role: $role, myNickname: $myNickname, status: $status, creatorId: $creatorId, memberCount: $memberCount)';
   }
 }
-
-/// 家庭展示模型（用于UI）
-class FamilyModel {
-  final String id;
-  final String name;
-  final String? avatarUrl;
-  final List<CareReceiver> careReceivers;
-  final List<FamilyMember> members;
-  final DateTime createdAt;
-
-  FamilyModel({
-    required this.id,
-    required this.name,
-    this.avatarUrl,
-    required this.careReceivers,
-    required this.members,
-    required this.createdAt,
-  });
-}
-
