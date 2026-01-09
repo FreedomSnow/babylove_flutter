@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/todo_model.dart';
 import '../services/todo_service.dart';
+import '../services/app_state_service.dart';
 import '../providers/app_state_provider.dart';
 import '../widgets/family_selector.dart';
 import 'todo_edit_page.dart';
@@ -147,106 +148,142 @@ class _TodoPageState extends State<TodoPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Consumer<AppStateProvider>(
-          builder: (context, appState, child) {
-            return FamilySelector(
-              onChanged: () {
-                _loadTodos();
+    final appStateService = AppStateService();
+
+    return AnimatedBuilder(
+      animation: appStateService,
+      builder: (context, _) {
+        final hasSetup = appStateService.hasCompletedSetup;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Consumer<AppStateProvider>(
+              builder: (context, appState, child) {
+                return FamilySelector(
+                  onChanged: () {
+                    _loadTodos();
+                  },
+                );
               },
-            );
-          },
-        ),
-        toolbarHeight: 76,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _navigateToEditTodo(null),
-            tooltip: '新建待办',
+            ),
+            toolbarHeight: 76,
+            actions: hasSetup
+                ? [
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: () => _navigateToEditTodo(null),
+                      tooltip: '新建待办',
+                    ),
+                  ]
+                : [],
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // 日期选择器
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(_getDateLabel()),
-                    onPressed: () => _selectDate(context),
+          body: hasSetup
+              ? Column(
+                  children: [
+                    // 日期选择器
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_today),
+                              label: Text(_getDateLabel()),
+                              onPressed: () => _selectDate(context),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.chevron_left),
+                            onPressed: () {
+                              setState(() {
+                                _selectedDate =
+                                    _selectedDate.subtract(const Duration(days: 1));
+                              });
+                              _loadTodos();
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.chevron_right),
+                            onPressed: () {
+                              setState(() {
+                                _selectedDate =
+                                    _selectedDate.add(const Duration(days: 1));
+                              });
+                              _loadTodos();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const Divider(height: 1),
+
+                    // 待办列表
+                    Expanded(
+                      child: _isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : _todos.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.event_available,
+                                        size: 64,
+                                        color: Colors.grey[400],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        '暂无待办事项',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  padding: const EdgeInsets.all(16),
+                                  itemCount: _todos.length,
+                                  itemBuilder: (context, index) {
+                                    final todo = _todos[index];
+                                    return _TodoCard(
+                                      todo: todo,
+                                      onToggleComplete: () =>
+                                          _toggleTodoComplete(todo.id),
+                                      onEdit: () => _navigateToEditTodo(todo),
+                                      onDelete: () => _deleteTodo(todo.id),
+                                    );
+                                  },
+                                ),
+                    ),
+                  ],
+                )
+              : Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '请先选择家庭和被照顾者',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: () {
-                    setState(() {
-                      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
-                    });
-                    _loadTodos();
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: () {
-                    setState(() {
-                      _selectedDate = _selectedDate.add(const Duration(days: 1));
-                    });
-                    _loadTodos();
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          const Divider(height: 1),
-
-          // 待办列表
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _todos.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.event_available,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              '暂无待办事项',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _todos.length,
-                        itemBuilder: (context, index) {
-                          final todo = _todos[index];
-                          return _TodoCard(
-                            todo: todo,
-                            onToggleComplete: () => _toggleTodoComplete(todo.id),
-                            onEdit: () => _navigateToEditTodo(todo),
-                            onDelete: () => _deleteTodo(todo.id),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

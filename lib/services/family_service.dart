@@ -154,9 +154,38 @@ class FamilyService {
         '/api/families/switch',
         data: request,
         fromJson: (json) {
-          if (json is Map<String, dynamic> && json['family'] != null) {
-            return Family.fromJson(json['family'] as Map<String, dynamic>);
+          // 支持多种后端返回格式：
+          // 1) 旧格式：直接返回 family 对象
+          // 2) 新格式：{ data: { family: {...}, care_receiver_ids: [...], last_care_receiver_id: '...' } }
+          // 3) 新格式（无 data 包装）：{ family: {...}, care_receiver_ids: [...], last_care_receiver_id: '...' }
+
+          if (json is Map<String, dynamic>) {
+            // 如果存在 data 包装，优先使用 data
+            final Map<String, dynamic> container = json['data'] is Map<String, dynamic>
+                ? (json['data'] as Map<String, dynamic>)
+                : json;
+
+            // family 可能在 container['family'] 或 container 本身
+            final Map<String, dynamic> familyJson = container['family'] is Map<String, dynamic>
+                ? (container['family'] as Map<String, dynamic>)
+                : container;
+
+            final family = Family.fromJson(familyJson);
+
+            // 如果提供了 last_care_receiver_id，则创建一个占位的 CareReceiver 对象保存 id（name 使用空字符串）
+            if (container['last_care_receiver_id'] != null) {
+              try {
+                final lastId = container['last_care_receiver_id']?.toString();
+                if (lastId != null && lastId.isNotEmpty) {
+                  family.lastCareReceiver = CareReceiver(id: lastId, name: '');
+                }
+              } catch (_) {}
+            }
+
+            return family;
           }
+
+          // 回退解析（尽量兼容）
           return Family.fromJson(json as Map<String, dynamic>);
         },
       );
