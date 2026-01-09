@@ -66,15 +66,41 @@ class AppUtils {
   /// 参数：
   /// - [birthDate] 出生日期
   ///
-  /// 返回：年龄（整数）
-  static int calculateAge(DateTime birthDate) {
+  /// 返回：格式化的年龄字符串，如 "2岁3个月"、"5岁"，或 "未出生" (当出生日期在未来时)
+  static String calculateAge(DateTime birthDate) {
     final now = DateTime.now();
-    int age = now.year - birthDate.year;
-    if (now.month < birthDate.month ||
-        (now.month == birthDate.month && now.day < birthDate.day)) {
-      age--;
+    
+    // 如果出生日期在未来，返回 "未出生"
+    if (birthDate.isAfter(now)) {
+      return '未出生';
     }
-    return age;
+    
+    int years = now.year - birthDate.year;
+    int months = now.month - birthDate.month;
+    
+    // 调整月数
+    if (now.day < birthDate.day) {
+      months--;
+    }
+    
+    // 调整年数
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+    
+    // 如果年龄为 0 岁
+    if (years == 0) {
+      return months == 0 ? '未出生' : '$months个月';
+    }
+    
+    // 如果月数为 0，只显示年龄
+    if (months == 0) {
+      return '$years岁';
+    }
+    
+    // 显示年龄和月数
+    return '$years岁$months个月';
   }
 
   /// 格式化日期为中文格式
@@ -90,7 +116,7 @@ class AppUtils {
   /// 构建被照顾者完整信息字符串
   ///
   /// 参数：
-  /// - [birthDate] 出生日期
+  /// - [birthDate] 出生日期 (DateTime 格式)
   /// - [gender] 性别
   ///
   /// 返回：格式化的信息字符串，例如：1941年11月25日 · 蛇 · 84岁 · 女
@@ -102,10 +128,10 @@ class AppUtils {
       return getGenderText(gender);
     }
 
-    final age = calculateAge(birthDate);
+    final ageStr = calculateAge(birthDate);
     final zodiac = getChineseZodiac(birthDate);
     final genderText = getGenderText(gender);
 
-    return '${formatDateChinese(birthDate)} · $zodiac · $age岁 · $genderText';
+    return '${formatDateChinese(birthDate)} · $zodiac · $ageStr · $genderText';
   }
 }

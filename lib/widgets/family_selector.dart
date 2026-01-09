@@ -28,7 +28,18 @@ class _FamilySelectorState extends State<FamilySelector> {
     super.initState();
     _appStateListener = _onAppStateChanged;
     _appState.addListener(_appStateListener);
-    _syncFromState(notifyProvider: true);
+    // 先同步状态，延迟通知 Provider（避免在 build 期间触发 notifyListeners）
+    _syncFromState(notifyProvider: false);
+    // 在当前帧构建完成后再通知 Provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _currentFamily != null) {
+        final provider = context.read<AppStateProvider>();
+        provider.updateFamilyAndCareReceiver(
+          _currentFamily!.id,
+          _currentCareReceiver?.id,
+        );
+      }
+    });
   }
 
   void _onAppStateChanged() {
@@ -79,7 +90,7 @@ class _FamilySelectorState extends State<FamilySelector> {
 
             return ListTile(
               leading: CircleAvatar(
-                backgroundImage: family.avatar != null
+                backgroundImage: family.avatar != null && family.avatar!.isNotEmpty
                     ? NetworkImage(family.avatar!)
                     : null,
                 child: family.avatar == null
@@ -146,7 +157,7 @@ class _FamilySelectorState extends State<FamilySelector> {
 
             return ListTile(
               leading: CircleAvatar(
-                backgroundImage: careReceiver.avatar != null
+                backgroundImage: careReceiver.avatar != null && careReceiver.avatar!.isNotEmpty
                     ? NetworkImage(careReceiver.avatar!)
                     : null,
                 child: careReceiver.avatar == null
@@ -156,8 +167,8 @@ class _FamilySelectorState extends State<FamilySelector> {
               title: Text(careReceiver.name),
               subtitle: Text(
                 careReceiver.birthDate != null
-                    ? '${DateTime.fromMillisecondsSinceEpoch(careReceiver.birthDate! * 1000).year}年${DateTime.fromMillisecondsSinceEpoch(careReceiver.birthDate! * 1000).month}月'
-                    : '',
+                    ? '出生日期: ${careReceiver.birthDate}'
+                    : '出生日期未知',
               ),
               trailing: isSelected
                   ? Icon(

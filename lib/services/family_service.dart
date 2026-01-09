@@ -2,6 +2,7 @@ import 'package:babylove_flutter/core/network/network.dart';
 import 'package:babylove_flutter/models/family_model.dart';
 import 'package:babylove_flutter/models/family_member_model.dart';
 import 'package:babylove_flutter/models/care_receiver_model.dart';
+import 'package:babylove_flutter/services/care_receiver_service.dart';
 import 'package:flutter/material.dart';
 
 /// 家庭 API 服务
@@ -278,6 +279,55 @@ class FamilyService {
     }
   }
 
+  /// 加载家庭成员和被照顾者列表
+  /// 并行调用两个 API：getFamilyMembers 和 getCareReceivers
+  ///
+  /// 参数：
+  /// - [familyId] 家庭 ID
+  ///
+  /// 返回：包含成员列表和被照顾者列表的响应对象，若任一 API 失败则返回该失败响应
+  Future<ApiResponseWithStringCode<FamilyDataResponse>> loadFamilyData({
+    required String familyId,
+  }) async {
+    try {
+      final careReceiverService = CareReceiverService();
+      
+      // 并行调用两个 API
+      final memberResponse = await getFamilyMembers(familyId: familyId);
+      final careReceiverResponse = await careReceiverService.getCareReceivers(
+        familyId: familyId,
+      );
+
+      // 检查两个请求是否都成功
+      if (memberResponse.isSuccess && careReceiverResponse.isSuccess) {
+        return ApiResponseWithStringCode<FamilyDataResponse>(
+          code: memberResponse.code,
+          data: FamilyDataResponse(
+            members: memberResponse.data ?? [],
+            careReceivers: careReceiverResponse.data ?? [],
+          ),
+          message: memberResponse.message,
+        );
+      } else {
+        // 返回失败的响应
+        if (!memberResponse.isSuccess) {
+          return ApiResponseWithStringCode<FamilyDataResponse>(
+            code: memberResponse.code,
+            message: memberResponse.message,
+          );
+        } else {
+          return ApiResponseWithStringCode<FamilyDataResponse>(
+            code: careReceiverResponse.code,
+            message: careReceiverResponse.message,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in loadFamilyData: $e');
+      rethrow;
+    }
+  }
+
   /// 更新我在家庭中的昵称
   ///
   /// 参数：
@@ -432,14 +482,14 @@ class FamilyService {
             id: 'care_receiver_1',
             name: '外婆',
             gender: 'female',
-            birthDate: DateTime(1941, 11, 25).millisecondsSinceEpoch ~/ 1000,
+            birthDate: '1941-11-25',
             avatar: null,
           ),
           CareReceiver(
             id: 'care_receiver_2',
             name: '外公',
             gender: 'male',
-            birthDate: DateTime(1938, 3, 15).millisecondsSinceEpoch ~/ 1000,
+            birthDate: '1938-03-15',
             avatar: null,
           ),
         ],
@@ -474,7 +524,7 @@ class FamilyService {
             id: 'care_receiver_3',
             name: '奶奶',
             gender: 'female',
-            birthDate: DateTime(1942, 8, 20).millisecondsSinceEpoch ~/ 1000,
+            birthDate: '1942-08-20',
             avatar: null,
           ),
         ],
@@ -492,4 +542,15 @@ class FamilyService {
       ),
     ];
   }
+}
+
+/// 家庭数据响应模型
+class FamilyDataResponse {
+  final List<FamilyMember> members;
+  final List<CareReceiver> careReceivers;
+
+  FamilyDataResponse({
+    required this.members,
+    required this.careReceivers,
+  });
 }

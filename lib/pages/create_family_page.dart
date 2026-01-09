@@ -159,7 +159,9 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
         id: '',
         name: _careNicknameController.text.trim(),
         gender: _careGender,
-        birthDate: _careBirthDate!.millisecondsSinceEpoch ~/ 1000,
+        birthDate: '${_careBirthDate!.year.toString().padLeft(4, '0')}-'
+            '${_careBirthDate!.month.toString().padLeft(2, '0')}-'
+            '${_careBirthDate!.day.toString().padLeft(2, '0')}',
         avatar: _careAvatarUrl,
       );
 

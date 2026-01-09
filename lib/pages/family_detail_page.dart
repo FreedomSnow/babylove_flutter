@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/family_model.dart';
-import '../core/utils.dart';
+import '../services/family_service.dart';
+import '../services/app_state_service.dart';
 
 /// 家庭详情页面
 class FamilyDetailPage extends StatefulWidget {
@@ -13,6 +14,80 @@ class FamilyDetailPage extends StatefulWidget {
 }
 
 class _FamilyDetailPageState extends State<FamilyDetailPage> {
+  final FamilyService _familyService = FamilyService();
+  final AppStateService _appState = AppStateService();
+  
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFamilyData();
+  }
+
+  /// 加载家庭成员和被照顾者列表
+  Future<void> _loadFamilyData() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // 调用通用的 loadFamilyData 方法
+      final response = await _familyService.loadFamilyData(
+        familyId: widget.family.id,
+      );
+
+      if (!mounted) return;
+
+      if (response.isSuccess) {
+        // 更新 widget.family 对象
+        widget.family.members = response.data!.members;
+        widget.family.careReceivers = response.data!.careReceivers;
+
+        // 更新 AppStateService 中的数据
+        _updateAppState();
+
+        setState(() {
+          _isLoading = false;
+        });
+      } else {
+        // 处理错误
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.message ?? '加载数据失败'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('加载数据失败: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// 更新 AppStateService 中的数据
+  void _updateAppState() {
+    _appState.updateFamilyMembersAndCareReceivers(
+      familyId: widget.family.id,
+      careReceivers: widget.family.careReceivers,
+      members: widget.family.members,
+    );
+  }
+
   String _getRoleText(String role) {
     switch (role) {
       case 'owner':
@@ -34,6 +109,16 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 显示加载状态
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.family.name)),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: Text(widget.family.name)),
       body: ListView(
@@ -47,7 +132,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                 children: [
                   CircleAvatar(
                     radius: 40,
-                    backgroundImage: widget.family.avatar != null
+                    backgroundImage: widget.family.avatar != null && widget.family.avatar!.isNotEmpty
                         ? NetworkImage(widget.family.avatar!)
                         : null,
                     child: widget.family.avatar == null
@@ -122,7 +207,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                   contentPadding: const EdgeInsets.all(12),
                   leading: CircleAvatar(
                     radius: 28,
-                    backgroundImage: careReceiver.avatar != null
+                    backgroundImage: careReceiver.avatar != null && careReceiver.avatar!.isNotEmpty
                         ? NetworkImage(careReceiver.avatar!)
                         : null,
                     child: careReceiver.avatar == null
@@ -139,14 +224,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      AppUtils.buildCareReceiverInfo(
-                        birthDate: careReceiver.birthDate != null
-                            ? DateTime.fromMillisecondsSinceEpoch(
-                                careReceiver.birthDate! * 1000,
-                              )
-                            : null,
-                        gender: careReceiver.gender,
-                      ),
+                      careReceiver.buildCareReceiverInfo(),
                       style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     ),
                   ),
@@ -197,7 +275,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                   contentPadding: const EdgeInsets.all(12),
                   leading: CircleAvatar(
                     radius: 24,
-                    backgroundImage: member.avatarUrl != null
+                    backgroundImage: member.avatarUrl != null && member.avatarUrl!.isNotEmpty
                         ? NetworkImage(member.avatarUrl!)
                         : null,
                     child: member.avatarUrl == null
