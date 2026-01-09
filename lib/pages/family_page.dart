@@ -6,7 +6,6 @@ import '../services/family_service.dart';
 import '../services/app_state_service.dart';
 import '../providers/app_state_provider.dart';
 import '../widgets/family_selector.dart';
-import '../core/utils.dart';
 import 'family_detail_page.dart';
 
 /// 家庭页面
@@ -43,6 +42,49 @@ class _FamilyPageState extends State<FamilyPage> {
         setState(() {
           _families = _appState.myFamilies;
         });
+
+        // 若 AppState 中存在最近访问的家庭，则尝试加载该家庭的成员和被照顾者信息
+        final lastFamily = _appState.lastFamily;
+        if (lastFamily != null) {
+          try {
+            final loadResp = await _familyService.loadFamilyData(familyId: lastFamily.id);
+            if (loadResp.isSuccess && loadResp.data != null) {
+              final data = loadResp.data!;
+
+              // 更新 AppState 中的家庭成员与被照顾者，并同步到 myFamilies
+              _appState.updateFamilyMembersAndCareReceivers(
+                familyId: lastFamily.id,
+                careReceivers: data.careReceivers,
+                members: data.members,
+              );
+
+              // 校验并修正最近的被照顾者，如果之前的被照顾者不在新列表中则回退到首个（若有）
+              // final currentCr = _appState.lastCareReceiver;
+              // if (currentCr == null ||
+              //     !data.careReceivers.any((cr) => cr.id == currentCr.id)) {
+              //   final newCr = data.careReceivers.isNotEmpty ? data.careReceivers.first : null;
+              //   _appState.setLastCareReceiver(newCr);
+              // }
+
+              // 更新本地缓存显示
+              setState(() {
+                _families = _appState.myFamilies;
+              });
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('加载家庭数据失败: ${loadResp.message ?? '未知错误'}')),
+                );
+              }
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('加载家庭数据异常: $e')),
+              );
+            }
+          }
+        }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -118,40 +160,28 @@ class _FamilyPageState extends State<FamilyPage> {
     }
 
     final lastFamily = _appState.lastFamily;
-    final lastCareReceiver = _appState.lastCareReceiver;
+
+    // 将选中的家庭放在第一位
+    List<Family> sortedFamilies = List.from(_families);
+    if (lastFamily != null) {
+      final selectedIndex = sortedFamilies.indexWhere((f) => f.id == lastFamily.id);
+      if (selectedIndex > 0) {
+        final selected = sortedFamilies.removeAt(selectedIndex);
+        sortedFamilies.insert(0, selected);
+      }
+    }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: _families.length,
+      itemCount: sortedFamilies.length,
       itemBuilder: (context, index) {
-        final family = _families[index];
+        final family = sortedFamilies[index];
         final isCurrentFamily =
             lastFamily != null && family.id == lastFamily.id;
 
-        // 当前被照顾者：当前家庭显示 AppState 的最近护理对象，否则展示该家庭的首个
-        final CareReceiver currentCareReceiver = isCurrentFamily
-            ? (lastCareReceiver ??
-                  (family.careReceivers.isNotEmpty
-                      ? family.careReceivers.first
-                      : CareReceiver(
-                          id: '',
-                          name: '无',
-                          gender: 'unknown',
-                          birthDate: null,
-                        )))
-            : (family.careReceivers.isNotEmpty
-                  ? family.careReceivers.first
-                  : CareReceiver(
-                      id: '',
-                      name: '无',
-                      gender: 'unknown',
-                      birthDate: null,
-                    ));
-
         return _FamilyCard(
-          family: family,
-          currentCareReceiver: currentCareReceiver,
+          family: isCurrentFamily ? lastFamily : family,
           isCurrentFamily: isCurrentFamily,
           onTap: () {
             Navigator.push(
@@ -170,23 +200,89 @@ class _FamilyPageState extends State<FamilyPage> {
 /// 家庭卡片组件
 class _FamilyCard extends StatelessWidget {
   final Family family;
-  final CareReceiver currentCareReceiver;
   final bool isCurrentFamily;
   final VoidCallback onTap;
 
   const _FamilyCard({
     required this.family,
-    required this.currentCareReceiver,
     required this.isCurrentFamily,
     required this.onTap,
   });
 
   String _buildCareReceiverInfo(CareReceiver careReceiver) {
-    return AppUtils.buildCareReceiverInfo(
-      birthDate: careReceiver.birthDate != null
-          ? DateTime.fromMillisecondsSinceEpoch(careReceiver.birthDate! * 1000)
-          : null,
-      gender: careReceiver.gender,
+    return careReceiver.buildCareReceiverInfo();
+  }
+
+  Widget _buildCareReceiverSection() {
+    final careReceiver = family.lastCareReceiver!;
+    return Column(
+      children: [
+        const Divider(height: 24),
+        // 当前被照顾者信息
+        Row(
+          children: [
+            // 被照顾者头像
+            CircleAvatar(
+              radius: 24,
+              backgroundImage: careReceiver.avatar != null && careReceiver.avatar!.isNotEmpty
+                  ? NetworkImage(careReceiver.avatar!)
+                  : null,
+              child: careReceiver.avatar == null
+                  ? const Icon(Icons.person, size: 24)
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            // 被照顾者详情
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          careReceiver.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '选中',
+                          style: TextStyle(
+                            color: Colors.blue[700],
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    _buildCareReceiverInfo(careReceiver),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -215,7 +311,7 @@ class _FamilyCard extends StatelessWidget {
                   // 家庭头像
                   CircleAvatar(
                     radius: 30,
-                    backgroundImage: family.avatar != null
+                    backgroundImage: family.avatar != null && family.avatar!.isNotEmpty
                         ? NetworkImage(family.avatar!)
                         : null,
                     child: family.avatar == null
@@ -279,76 +375,8 @@ class _FamilyCard extends StatelessWidget {
                 ],
               ),
 
-              if (family.lastCareReceiver != null) ...[
-                const Divider(height: 24),
-
-                // 当前被照顾者信息
-                Row(
-                  children: [
-                    // 被照顾者头像
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundImage: currentCareReceiver.avatar != null
-                          ? NetworkImage(currentCareReceiver.avatar!)
-                          : null,
-                      child: currentCareReceiver.avatar == null
-                          ? const Icon(Icons.person, size: 24)
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-
-                    // 被照顾者详情
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  currentCareReceiver.name,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (isCurrentFamily) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue[50],
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '当前照顾者',
-                                    style: TextStyle(
-                                      color: Colors.blue[700],
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _buildCareReceiverInfo(currentCareReceiver),
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              if (isCurrentFamily && family.lastCareReceiver != null) ...[
+                _buildCareReceiverSection(),
               ],
             ],
           ),

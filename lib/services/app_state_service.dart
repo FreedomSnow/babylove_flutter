@@ -1,6 +1,7 @@
 import 'package:babylove_flutter/models/user_model.dart';
 import 'package:babylove_flutter/models/family_model.dart';
 import 'package:babylove_flutter/models/care_receiver_model.dart';
+import 'package:babylove_flutter/models/family_member_model.dart';
 import 'package:flutter/foundation.dart';
 
 /// 全局应用状态服务
@@ -64,27 +65,14 @@ class AppStateService with ChangeNotifier {
 
     // 若已有最近家庭，则尝试在新列表中找到它并复用引用
     if (_lastFamily != null) {
-      final matched = _myFamilies.firstWhere(
-        (f) => f.id == _lastFamily!.id,
-        orElse: () => _myFamilies.first,
-      );
-      _lastFamily = matched;
-
-      // 校正最近护理对象：若不存在于该家庭，则回退到首个（若有）
-      final currentCr = _lastFamily!.lastCareReceiver;
-      if (currentCr == null ||
-          !_lastFamily!.careReceivers.any((cr) => cr.id == currentCr.id)) {
-        _lastFamily!.lastCareReceiver = _lastFamily!.careReceivers.isNotEmpty
-            ? _lastFamily!.careReceivers.first
-            : null;
+      // 更新 myFamilies 中的该家庭
+      final familyIndex = _myFamilies.indexWhere((f) => f.id == _lastFamily!.id);
+      if (familyIndex >= 0) {
+        _myFamilies[familyIndex].lastCareReceiver = _lastFamily!.lastCareReceiver;
+        _myFamilies[familyIndex].careReceivers = _lastFamily!.careReceivers;
+        _myFamilies[familyIndex].members = _lastFamily!.members;
       }
-    } else {
-      // 没有最近家庭，则默认第一个，并设置其默认护理对象
-      _lastFamily = _myFamilies.first;
-      _lastFamily!.lastCareReceiver = _lastFamily!.careReceivers.isNotEmpty
-          ? _lastFamily!.careReceivers.first
-          : null;
-    }
+    } 
 
     notifyListeners();
   }
@@ -100,10 +88,36 @@ class AppStateService with ChangeNotifier {
     }
     if (lastFamily != null) {
       _lastFamily = lastFamily;
+      debugPrint('Updated lastFamily to ${lastFamily.id}');
+      _lastFamily!.lastCareReceiver = lastCareReceiver;
+      debugPrint(
+          'Updated lastCareReceiver to ${lastCareReceiver?.id}');
     }
-    if (lastCareReceiver != null) {
-      if (_lastFamily != null) {
-        _lastFamily!.lastCareReceiver = lastCareReceiver;
+
+    notifyListeners();
+  }
+
+  /// 更新指定家庭的成员和被照顾者信息
+  /// 同时更新 lastFamily 和 myFamilies 中的该家庭
+  void updateFamilyMembersAndCareReceivers({
+    required String familyId,
+    required List<CareReceiver> careReceivers,
+    List<FamilyMember>? members,
+  }) {
+    // 更新 lastFamily
+    if (_lastFamily?.id == familyId) {
+      _lastFamily!.careReceivers = careReceivers;
+      if (members != null) {
+        _lastFamily!.members = members;
+      }
+    }
+
+    // 更新 myFamilies 中的该家庭
+    final familyIndex = _myFamilies.indexWhere((f) => f.id == familyId);
+    if (familyIndex >= 0) {
+      _myFamilies[familyIndex].careReceivers = careReceivers;
+      if (members != null) {
+        _myFamilies[familyIndex].members = members;
       }
     }
 

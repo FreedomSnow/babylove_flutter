@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../models/family_model.dart';
 import '../models/care_receiver_model.dart';
 import '../services/app_state_service.dart';
+import '../services/family_service.dart';
+import '../services/care_receiver_service.dart';
 import '../providers/app_state_provider.dart';
 
 /// 家庭和被照顾者选择器组件
@@ -18,7 +20,8 @@ class FamilySelector extends StatefulWidget {
 
 class _FamilySelectorState extends State<FamilySelector> {
   final AppStateService _appState = AppStateService();
-  List<Family> _families = [];
+  final FamilyService _familyService = FamilyService();
+  final CareReceiverService _careReceiverService = CareReceiverService();
   Family? _currentFamily;
   CareReceiver? _currentCareReceiver;
   late final VoidCallback _appStateListener;
@@ -28,7 +31,18 @@ class _FamilySelectorState extends State<FamilySelector> {
     super.initState();
     _appStateListener = _onAppStateChanged;
     _appState.addListener(_appStateListener);
-    _syncFromState(notifyProvider: true);
+    // 先同步状态，延迟通知 Provider（避免在 build 期间触发 notifyListeners）
+    _syncFromState(notifyProvider: false);
+    // 在当前帧构建完成后再通知 Provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _currentFamily != null) {
+        final provider = context.read<AppStateProvider>();
+        provider.updateFamilyAndCareReceiver(
+          _currentFamily!.id,
+          _currentCareReceiver?.id,
+        );
+      }
+    });
   }
 
   void _onAppStateChanged() {
@@ -36,19 +50,14 @@ class _FamilySelectorState extends State<FamilySelector> {
   }
 
   void _syncFromState({bool notifyProvider = false}) {
-    final families = _appState.myFamilies;
     final lastFamily = _appState.lastFamily;
     final lastCareReceiver = _appState.lastCareReceiver;
-
+    
     setState(() {
-      _families = families;
-      _currentFamily =
-          lastFamily ?? (families.isNotEmpty ? families.first : null);
-      _currentCareReceiver =
-          lastCareReceiver ??
-          (_currentFamily != null && _currentFamily!.careReceivers.isNotEmpty
-              ? _currentFamily!.careReceivers.first
-              : null);
+      // 不使用回退到第一个家庭；如果 lastFamily 为空则保留为 null，显示“未选中家庭"
+      _currentFamily = lastFamily;
+      // 不回退到家庭的第一个被照顾者；仅使用 lastCareReceiver
+      _currentCareReceiver = lastCareReceiver;
     });
 
     if (notifyProvider && _currentFamily != null) {
@@ -70,16 +79,17 @@ class _FamilySelectorState extends State<FamilySelector> {
     showModalBottomSheet(
       context: context,
       builder: (context) {
+        final families = _appState.myFamilies;
         return ListView.builder(
           shrinkWrap: true,
-          itemCount: _families.length,
+          itemCount: families.length,
           itemBuilder: (context, index) {
-            final family = _families[index];
+            final family = families[index];
             final isSelected = family.id == _currentFamily?.id;
 
             return ListTile(
               leading: CircleAvatar(
-                backgroundImage: family.avatar != null
+                backgroundImage: family.avatar != null && family.avatar!.isNotEmpty
                     ? NetworkImage(family.avatar!)
                     : null,
                 child: family.avatar == null
@@ -94,30 +104,104 @@ class _FamilySelectorState extends State<FamilySelector> {
                     )
                   : null,
               selected: isSelected,
-              onTap: () {
-                // 更新全局状态服务
-                _appState.setLastFamily(family);
-                if (family.careReceivers.isNotEmpty) {
-                  _appState.setLastCareReceiver(family.careReceivers.first);
-                } else {
-                  _appState.setLastCareReceiver(null);
-                }
+              onTap: () async {
+                Navigator.pop(context);
 
-                // 本地 UI 状态
-                setState(() {
-                  _currentFamily = _appState.lastFamily;
-                  _currentCareReceiver = _appState.lastCareReceiver;
-                });
-
-                // 通知 Provider（供全局监听者使用）
-                final provider = context.read<AppStateProvider>();
-                provider.updateFamilyAndCareReceiver(
-                  _currentFamily!.id,
-                  _currentCareReceiver?.id,
+                // 显示 loading 对话框
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) => const Center(child: CircularProgressIndicator()),
                 );
 
-                Navigator.pop(context);
-                widget.onChanged?.call();
+                try {
+                  final resp = await _familyService.switchFamily(familyId: family.id);
+                  if (mounted) Navigator.of(context).pop(); // 关闭 loading
+
+                  if (resp.isSuccess && resp.data != null) {
+                    final switchedFamily = resp.data!;
+
+                    // 更新最近家庭
+                    _appState.setLastFamily(switchedFamily);
+
+                    // 如果后端返回的家庭中没有被照顾者，则尝试主动加载家庭数据
+                    if (switchedFamily.careReceivers.isEmpty) {
+                      try {
+                        final loadResp = await _familyService.loadFamilyData(familyId: switchedFamily.id);
+                        if (loadResp.isSuccess && loadResp.data != null) {
+                          final data = loadResp.data!;
+                          _appState.updateFamilyMembersAndCareReceivers(
+                            familyId: switchedFamily.id,
+                            careReceivers: data.careReceivers,
+                            members: data.members,
+                          );
+
+                          if (data.careReceivers.isNotEmpty) {
+                            _appState.setLastCareReceiver(data.careReceivers.first);
+                          } else {
+                            _appState.setLastCareReceiver(null);
+                          }
+                        } else {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('加载家庭数据失败: ${loadResp.message ?? '未知错误'}')),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('加载家庭数据异常: $e')),
+                          );
+                        }
+                      }
+                    }
+
+                      // 如果后端返回的 switchedFamily 包含一个占位的 lastCareReceiver（仅有 id，name 为空），
+                      // 则尝试在 switchedFamily.careReceivers 中查找完整实例并设置到 AppState
+                      if (switchedFamily.lastCareReceiver != null &&
+                          switchedFamily.lastCareReceiver!.id.isNotEmpty &&
+                          switchedFamily.lastCareReceiver!.name.isEmpty) {
+                        final matches = switchedFamily.careReceivers
+                            .where((cr) => cr.id == switchedFamily.lastCareReceiver!.id)
+                            .toList();
+                        if (matches.isNotEmpty) {
+                          _appState.setLastCareReceiver(matches.first);
+                        }
+                      }
+
+
+
+                    // 更新本地 UI 状态并通知 Provider
+                    setState(() {
+                      _currentFamily = _appState.lastFamily;
+                      _currentCareReceiver = _appState.lastCareReceiver;
+                    });
+
+                    final provider = context.read<AppStateProvider>();
+                    if (_currentFamily != null) {
+                      provider.updateFamilyAndCareReceiver(
+                        _currentFamily!.id,
+                        _currentCareReceiver?.id,
+                      );
+                    }
+
+                    widget.onChanged?.call();
+                  } else {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('切换家庭失败: ${resp.message ?? '未知错误'}')),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('切换家庭异常: $e')),
+                    );
+                  }
+                }
               },
             );
           },
@@ -130,7 +214,7 @@ class _FamilySelectorState extends State<FamilySelector> {
     if (_currentFamily == null || _currentFamily!.careReceivers.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('当前家庭没有被照顾者')));
+      ).showSnackBar(SnackBar(content: Text(_currentFamily == null ? '没有选中家庭' : '当前家庭没有被照顾者')));
       return;
     }
 
@@ -146,7 +230,7 @@ class _FamilySelectorState extends State<FamilySelector> {
 
             return ListTile(
               leading: CircleAvatar(
-                backgroundImage: careReceiver.avatar != null
+                backgroundImage: careReceiver.avatar != null && careReceiver.avatar!.isNotEmpty
                     ? NetworkImage(careReceiver.avatar!)
                     : null,
                 child: careReceiver.avatar == null
@@ -156,8 +240,8 @@ class _FamilySelectorState extends State<FamilySelector> {
               title: Text(careReceiver.name),
               subtitle: Text(
                 careReceiver.birthDate != null
-                    ? '${DateTime.fromMillisecondsSinceEpoch(careReceiver.birthDate! * 1000).year}年${DateTime.fromMillisecondsSinceEpoch(careReceiver.birthDate! * 1000).month}月'
-                    : '',
+                    ? '出生日期: ${careReceiver.birthDate}'
+                    : '出生日期未知',
               ),
               trailing: isSelected
                   ? Icon(
@@ -166,24 +250,61 @@ class _FamilySelectorState extends State<FamilySelector> {
                     )
                   : null,
               selected: isSelected,
-              onTap: () {
-                // 更新全局状态服务
-                _appState.setLastCareReceiver(careReceiver);
+              onTap: () async {
+                Navigator.pop(context);
 
-                // 本地 UI 状态
-                setState(() {
-                  _currentCareReceiver = _appState.lastCareReceiver;
-                });
-
-                // 通知 Provider（供全局监听者使用）
-                final provider = context.read<AppStateProvider>();
-                provider.updateFamilyAndCareReceiver(
-                  (_appState.lastFamily?.id) ?? _currentFamily!.id,
-                  _currentCareReceiver?.id,
+                // 显示 loading
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) => const Center(child: CircularProgressIndicator()),
                 );
 
-                Navigator.pop(context);
-                widget.onChanged?.call();
+                try {
+                  final familyId = (_appState.lastFamily?.id) ?? _currentFamily!.id;
+                  final resp = await _careReceiverService.switchCareReceiver(
+                    familyId: familyId,
+                    careReceiverId: careReceiver.id,
+                  );
+
+                  if (mounted) Navigator.of(context).pop(); // 关闭 loading
+
+                  if (resp.isSuccess && resp.data != null) {
+                    final data = resp.data!;
+
+                    // 更新 AppState：先更新家庭，再设置被照顾者
+                    _appState.setLastFamily(data.family);
+                    _appState.setLastCareReceiver(data.currentCareReceiver);
+
+                    // 同步本地 UI
+                    setState(() {
+                      _currentFamily = _appState.lastFamily;
+                      _currentCareReceiver = _appState.lastCareReceiver;
+                    });
+
+                    // 通知 Provider
+                    final provider = context.read<AppStateProvider>();
+                    provider.updateFamilyAndCareReceiver(
+                      _currentFamily!.id,
+                      _currentCareReceiver?.id,
+                    );
+
+                    widget.onChanged?.call();
+                  } else {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('切换被照顾者失败: ${resp.message ?? '未知错误'}')),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('切换被照顾者异常: $e')),
+                    );
+                  }
+                }
               },
             );
           },
@@ -230,7 +351,7 @@ class _FamilySelectorState extends State<FamilySelector> {
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        _currentFamily?.name ?? '选择家庭',
+                          _currentFamily?.name ?? '未选中家庭',
                         style: TextStyle(fontSize: 14, color: primaryColor),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -271,7 +392,7 @@ class _FamilySelectorState extends State<FamilySelector> {
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        _currentCareReceiver?.name ?? '选择被照顾者',
+                        _currentCareReceiver?.name ?? '未选中被照顾者',
                         style: TextStyle(fontSize: 14, color: primaryColor),
                         overflow: TextOverflow.ellipsis,
                       ),

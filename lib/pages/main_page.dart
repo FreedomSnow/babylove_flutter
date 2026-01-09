@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'todo_page.dart';
 import 'family_page.dart';
 import 'settings_page.dart';
+import '../services/family_service.dart';
+import '../services/app_state_service.dart';
 
 /// 主页面，包含底部导航栏
 class MainPage extends StatefulWidget {
@@ -13,12 +15,23 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   int _currentIndex = 0;
+  
+
+  final FamilyService _familyService = FamilyService();
+  final AppStateService _appState = AppStateService();
 
   final List<Widget> _pages = [
     const TodoPage(),
     const FamilyPage(),
     const SettingsPage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  // 不再在页面加载时自动初始化家庭数据
 
   @override
   Widget build(BuildContext context) {

@@ -2,6 +2,7 @@ import 'package:babylove_flutter/core/network/network.dart';
 import 'package:babylove_flutter/models/family_model.dart';
 import 'package:babylove_flutter/models/family_member_model.dart';
 import 'package:babylove_flutter/models/care_receiver_model.dart';
+import 'package:babylove_flutter/services/care_receiver_service.dart';
 import 'package:flutter/material.dart';
 
 /// 家庭 API 服务
@@ -153,9 +154,38 @@ class FamilyService {
         '/api/families/switch',
         data: request,
         fromJson: (json) {
-          if (json is Map<String, dynamic> && json['family'] != null) {
-            return Family.fromJson(json['family'] as Map<String, dynamic>);
+          // 支持多种后端返回格式：
+          // 1) 旧格式：直接返回 family 对象
+          // 2) 新格式：{ data: { family: {...}, care_receiver_ids: [...], last_care_receiver_id: '...' } }
+          // 3) 新格式（无 data 包装）：{ family: {...}, care_receiver_ids: [...], last_care_receiver_id: '...' }
+
+          if (json is Map<String, dynamic>) {
+            // 如果存在 data 包装，优先使用 data
+            final Map<String, dynamic> container = json['data'] is Map<String, dynamic>
+                ? (json['data'] as Map<String, dynamic>)
+                : json;
+
+            // family 可能在 container['family'] 或 container 本身
+            final Map<String, dynamic> familyJson = container['family'] is Map<String, dynamic>
+                ? (container['family'] as Map<String, dynamic>)
+                : container;
+
+            final family = Family.fromJson(familyJson);
+
+            // 如果提供了 last_care_receiver_id，则创建一个占位的 CareReceiver 对象保存 id（name 使用空字符串）
+            if (container['last_care_receiver_id'] != null) {
+              try {
+                final lastId = container['last_care_receiver_id']?.toString();
+                if (lastId != null && lastId.isNotEmpty) {
+                  family.lastCareReceiver = CareReceiver(id: lastId, name: '');
+                }
+              } catch (_) {}
+            }
+
+            return family;
           }
+
+          // 回退解析（尽量兼容）
           return Family.fromJson(json as Map<String, dynamic>);
         },
       );
@@ -274,6 +304,55 @@ class FamilyService {
       return response;
     } catch (e) {
       // 重新抛出异常
+      rethrow;
+    }
+  }
+
+  /// 加载家庭成员和被照顾者列表
+  /// 并行调用两个 API：getFamilyMembers 和 getCareReceivers
+  ///
+  /// 参数：
+  /// - [familyId] 家庭 ID
+  ///
+  /// 返回：包含成员列表和被照顾者列表的响应对象，若任一 API 失败则返回该失败响应
+  Future<ApiResponseWithStringCode<FamilyDataResponse>> loadFamilyData({
+    required String familyId,
+  }) async {
+    try {
+      final careReceiverService = CareReceiverService();
+      
+      // 并行调用两个 API
+      final memberResponse = await getFamilyMembers(familyId: familyId);
+      final careReceiverResponse = await careReceiverService.getCareReceivers(
+        familyId: familyId,
+      );
+
+      // 检查两个请求是否都成功
+      if (memberResponse.isSuccess && careReceiverResponse.isSuccess) {
+        return ApiResponseWithStringCode<FamilyDataResponse>(
+          code: memberResponse.code,
+          data: FamilyDataResponse(
+            members: memberResponse.data ?? [],
+            careReceivers: careReceiverResponse.data ?? [],
+          ),
+          message: memberResponse.message,
+        );
+      } else {
+        // 返回失败的响应
+        if (!memberResponse.isSuccess) {
+          return ApiResponseWithStringCode<FamilyDataResponse>(
+            code: memberResponse.code,
+            message: memberResponse.message,
+          );
+        } else {
+          return ApiResponseWithStringCode<FamilyDataResponse>(
+            code: careReceiverResponse.code,
+            message: careReceiverResponse.message,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in loadFamilyData: $e');
       rethrow;
     }
   }
@@ -432,14 +511,14 @@ class FamilyService {
             id: 'care_receiver_1',
             name: '外婆',
             gender: 'female',
-            birthDate: DateTime(1941, 11, 25).millisecondsSinceEpoch ~/ 1000,
+            birthDate: '1941-11-25',
             avatar: null,
           ),
           CareReceiver(
             id: 'care_receiver_2',
             name: '外公',
             gender: 'male',
-            birthDate: DateTime(1938, 3, 15).millisecondsSinceEpoch ~/ 1000,
+            birthDate: '1938-03-15',
             avatar: null,
           ),
         ],
@@ -474,7 +553,7 @@ class FamilyService {
             id: 'care_receiver_3',
             name: '奶奶',
             gender: 'female',
-            birthDate: DateTime(1942, 8, 20).millisecondsSinceEpoch ~/ 1000,
+            birthDate: '1942-08-20',
             avatar: null,
           ),
         ],
@@ -492,4 +571,15 @@ class FamilyService {
       ),
     ];
   }
+}
+
+/// 家庭数据响应模型
+class FamilyDataResponse {
+  final List<FamilyMember> members;
+  final List<CareReceiver> careReceivers;
+
+  FamilyDataResponse({
+    required this.members,
+    required this.careReceivers,
+  });
 }
