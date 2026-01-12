@@ -6,6 +6,7 @@ import '../services/family_service.dart';
 import '../services/app_state_service.dart';
 import '../providers/app_state_provider.dart';
 import '../widgets/family_selector.dart';
+import '../widgets/join_family_dialog.dart';
 import 'family_detail_page.dart';
 
 /// 家庭页面
@@ -116,6 +117,24 @@ class _FamilyPageState extends State<FamilyPage> {
           },
         ),
         toolbarHeight: 68,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: TextButton.icon(
+              onPressed: () async {
+                final joined = await showJoinFamilyDialog(context);
+                if (joined) {
+                  _loadFamiliesFromState();
+                }
+              },
+              icon: const Icon(Icons.group_add, color: Colors.white),
+              label: const Text('加入家庭', style: TextStyle(color: Colors.white)),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshFamilies,
