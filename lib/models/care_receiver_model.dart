@@ -110,13 +110,17 @@ class CareReceiver {
           '${dateTime.day.toString().padLeft(2, '0')}';
     }
 
+    final String? avatarRaw = json['avatar'] as String?;
+    final String avatarValue = (avatarRaw != null && avatarRaw.trim().isNotEmpty)
+        ? avatarRaw
+        : 'resource:///dependent/default.png';
+
     return CareReceiver(
       id: json['id']?.toString() ?? '',
       name: json['name'] as String? ?? '',
       gender: AppUtils.getGenderTextFromInt(json['gender'] as int?),
       birthDate: birthDateStr,
-      // avatar: json['avatar'] as String?,
-      avatar: '',
+      avatar: avatarValue,
       residence: json['residence'] as String?,
       phone: json['phone'] as String?,
       emergencyContact: json['emergency_contact'] != null

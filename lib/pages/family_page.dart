@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/image_utils.dart';
 import 'package:provider/provider.dart';
 import '../models/family_model.dart';
 import '../models/care_receiver_model.dart';
@@ -243,10 +244,15 @@ class _FamilyCard extends StatelessWidget {
             // 被照顾者头像
             CircleAvatar(
               radius: 24,
-              backgroundImage: careReceiver.avatar != null && careReceiver.avatar!.isNotEmpty
-                  ? NetworkImage(careReceiver.avatar!)
-                  : null,
-              child: careReceiver.avatar == null
+              backgroundImage: AppImageUtils.imageProviderFor(
+                careReceiver.avatar,
+                defaultResource: 'resource:///dependent/default.png',
+              ),
+              child: AppImageUtils.imageProviderFor(
+                        careReceiver.avatar,
+                        defaultResource: 'resource:///dependent/default.png',
+                      ) ==
+                      null
                   ? const Icon(Icons.person, size: 24)
                   : null,
             ),
@@ -330,10 +336,15 @@ class _FamilyCard extends StatelessWidget {
                   // 家庭头像
                   CircleAvatar(
                     radius: 30,
-                    backgroundImage: family.avatar != null && family.avatar!.isNotEmpty
-                        ? NetworkImage(family.avatar!)
-                        : null,
-                    child: family.avatar == null
+                    backgroundImage: AppImageUtils.imageProviderFor(
+                      family.avatar,
+                      defaultResource: 'resource:///family/family0.png',
+                    ),
+                    child: AppImageUtils.imageProviderFor(
+                              family.avatar,
+                              defaultResource: 'resource:///family/family0.png',
+                            ) ==
+                            null
                         ? const Icon(Icons.family_restroom, size: 30)
                         : null,
                   ),
