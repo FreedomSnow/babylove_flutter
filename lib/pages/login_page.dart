@@ -4,9 +4,9 @@ import 'package:babylove_flutter/services/auth_service.dart';
 import 'package:babylove_flutter/services/storage_service.dart';
 import 'package:babylove_flutter/services/app_state_service.dart';
 import 'package:babylove_flutter/core/network/network_exception.dart';
-import 'main_page.dart';
 import 'legal_document_page.dart';
 import 'welcome_page.dart';
+import 'data_loading_page.dart';
 
 /// 登录页面
 class LoginPage extends StatefulWidget {
@@ -171,9 +171,9 @@ class _LoginPageState extends State<LoginPage>
         // 根据是否有家庭和护理对象决定跳转页面
         if (mounted) {
           if (appState.hasCompletedSetup) {
-            // 已有家庭和护理对象，跳转到主页
+            // 已有家庭和护理对象，跳转到数据加载页，由其统一拉取数据并进入主页
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const MainPage()),
+              MaterialPageRoute(builder: (context) => const DataLoadingPage()),
             );
           } else {
             // 没有家庭或护理对象，跳转到欢迎页

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:babylove_flutter/services/auth_service.dart';
 import 'package:babylove_flutter/services/storage_service.dart';
-import 'package:babylove_flutter/services/family_service.dart';
-import 'package:babylove_flutter/services/app_state_service.dart';
+import 'package:babylove_flutter/services/initial_load_service.dart';
 import 'login_page.dart';
 import 'main_page.dart';
 
@@ -58,7 +57,7 @@ class _SplashPageState extends State<SplashPage> {
       // 检查 token 是否仍然有效
       if (authService.isLoggedIn()) {
         // 登录成功后，尝试加载用户相关的家庭数据并更新全局状态
-        final ok = await _loadUserFamiliesAndData();
+        final ok = await InitialLoadService.loadUserFamiliesAndData();
         if (ok) {
           _navigateToHome();
         } else {
@@ -82,44 +81,7 @@ class _SplashPageState extends State<SplashPage> {
     }
   }
 
-  /// 通用方法：获取我的家庭并根据 lastFamily 加载家庭数据，更新 AppStateService
-  /// 返回 true 表示全部成功，false 表示任一步骤失败
-  Future<bool> _loadUserFamiliesAndData() async {
-    try {
-      final familyService = FamilyService();
-      final appState = AppStateService();
-
-      // 1. 获取我的家庭列表
-      final familiesResp = await familyService.getMyFamilies();
-      if (!familiesResp.isSuccess) {
-        return false;
-      }
-
-      final families = familiesResp.data ?? [];
-      appState.setMyFamilies(families);
-
-      // 2. 如果有最近使用的家庭，则加载该家庭的成员和被照顾者数据
-      if (appState.lastFamily != null) {
-        final lastFamily = appState.lastFamily!;
-        final dataResp = await familyService.loadFamilyData(familyId: lastFamily.id);
-        if (!dataResp.isSuccess) {
-          return false;
-        }
-
-        final fd = dataResp.data!;
-        appState.updateFamilyMembersAndCareReceivers(
-          familyId: lastFamily.id,
-          careReceivers: fd.careReceivers,
-          members: fd.members,
-        );
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Error loading families/data: $e');
-      return false;
-    }
-  }
+  // 数据加载逻辑已提取为 InitialLoadService.loadUserFamiliesAndData()
 
   /// 跳转到登录页
   void _navigateToLogin() {
