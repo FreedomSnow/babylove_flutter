@@ -51,83 +51,136 @@ Future<String?> showAssetImagePicker(
   return showDialog<String>(
     context: context,
     builder: (ctx) {
-      return Dialog(
-        insetPadding: const EdgeInsets.all(16),
-        child: SizedBox(
-          width: 360,
-          height: 480,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Text(title ?? '选择图片', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: assets.isEmpty
-                    ? const Center(child: Text('未找到资源图片'))
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(12),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                        ),
-                        itemCount: assets.length,
-                        itemBuilder: (context, index) {
-                          final assetPath = assets[index];
-                          final parts = assetPath.split('/');
-                          final fileName = parts.isNotEmpty ? parts.last : '';
-                          final resource = 'resource:///$cleaned/$fileName';
-                          final isSelected = initialSelectedResource != null && initialSelectedResource == resource;
-                          return InkWell(
-                            onTap: () {
-                              Navigator.of(context).pop(resource);
-                            },
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-                                        width: 2,
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Image.asset(assetPath, fit: BoxFit.cover),
-                                    ),
-                                  ),
-                                  if (isSelected)
-                                    const Align(
-                                      alignment: Alignment.topRight,
-                                      child: Padding(
-                                        padding: EdgeInsets.all(6),
-                                        child: Icon(Icons.check_circle, color: Colors.white, size: 20),
-                                      ),
-                                    ),
-                                ],
-                              ),
+      String? selectedResource = initialSelectedResource;
+
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            insetPadding: const EdgeInsets.all(16),
+            child: SizedBox(
+              width: 360,
+              height: 480,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Text(title ?? '选择图片', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: assets.isEmpty
+                        ? const Center(child: Text('未找到资源图片'))
+                        : GridView.builder(
+                            padding: const EdgeInsets.all(12),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 4,
+                              mainAxisSpacing: 12,
+                              crossAxisSpacing: 12,
                             ),
-                          );
-                        },
-                      ),
+                            itemCount: assets.length,
+                            itemBuilder: (context, index) {
+                              final assetPath = assets[index];
+                              final parts = assetPath.split('/');
+                              final fileName = parts.isNotEmpty ? parts.last : '';
+                              final resource = 'resource:///$cleaned/$fileName';
+                              final isSelected = selectedResource != null && selectedResource == resource;
+                              return InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    selectedResource = resource;
+                                  });
+                                },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      AnimatedContainer(
+                                        duration: const Duration(milliseconds: 180),
+                                        curve: Curves.easeInOut,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? Theme.of(context).colorScheme.primary
+                                                : Colors.transparent,
+                                            width: 2,
+                                          ),
+                                          borderRadius: BorderRadius.circular(8),
+                                          boxShadow: isSelected
+                                              ? [
+                                                  BoxShadow(
+                                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                                                    blurRadius: 10,
+                                                    spreadRadius: 1,
+                                                  ),
+                                                ]
+                                              : null,
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(6),
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              Image.asset(assetPath, fit: BoxFit.cover),
+                                              if (isSelected)
+                                                Container(
+                                                  color: Colors.black.withOpacity(0.08),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        Positioned(
+                                          top: 6,
+                                          right: 6,
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context).colorScheme.primary,
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.15),
+                                                  blurRadius: 6,
+                                                ),
+                                              ],
+                                            ),
+                                            padding: const EdgeInsets.all(4),
+                                            child: const Icon(Icons.check, color: Colors.white, size: 16),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('取消'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: selectedResource == null
+                              ? null
+                              : () => Navigator.of(context).pop(selectedResource),
+                          child: const Text('确定'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('取消'),
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       );
     },
   );

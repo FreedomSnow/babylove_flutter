@@ -423,10 +423,20 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
       return;
     }
 
+    // 若名称与头像均未变化，则不调用更新，仅关闭编辑页
+    if (newName == _displayFamilyName && (newAvatar ?? '') == (_displayFamilyAvatar ?? '')) {
+      return;
+    }
+
     await _updateFamilyInfo(newName, newAvatar);
   }
 
   Future<void> _updateFamilyInfo(String newName, String? newAvatar) async {
+    // 若内容未变，直接返回（调用方的编辑页已关闭）
+    if (newName == _displayFamilyName && (newAvatar ?? '') == (_displayFamilyAvatar ?? '')) {
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {

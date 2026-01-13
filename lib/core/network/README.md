@@ -76,10 +76,10 @@ final response = await httpClient.post(
 );
 ```
 
-### 4. 设置认证 Token
+### 4. 设置认证 Token（accessToken）
 
 ```dart
-// 登录后设置 token
+// 登录后设置 accessToken
 httpClient.setToken('your_access_token');
 
 // 之后的请求会自动带上 Authorization header

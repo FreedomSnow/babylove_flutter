@@ -6,7 +6,8 @@ class StorageService {
   factory StorageService() => _instance;
   StorageService._internal();
 
-  static const String _tokenKey = 'auth_token';
+  static const String _accessTokenKey = 'access_token';
+  static const String _refreshTokenKey = 'refresh_token';
   static const String _themeKey = 'app_theme';
   static const String _elderModeKey = 'elder_mode';
   SharedPreferences? _prefs;
@@ -16,22 +17,47 @@ class StorageService {
     _prefs = await SharedPreferences.getInstance();
   }
 
-  /// 保存 token
-  Future<bool> saveToken(String token) async {
+  /// 保存 access token
+  Future<bool> saveAccessToken(String token) async {
     if (_prefs == null) await init();
-    return await _prefs!.setString(_tokenKey, token);
+    return await _prefs!.setString(_accessTokenKey, token);
   }
 
-  /// 获取 token
-  Future<String?> getToken() async {
+  /// 获取 access token
+  Future<String?> getAccessToken() async {
     if (_prefs == null) await init();
-    return _prefs!.getString(_tokenKey);
+    return _prefs!.getString(_accessTokenKey);
   }
 
-  /// 删除 token
-  Future<bool> removeToken() async {
+  /// 删除 access token
+  Future<bool> removeAccessToken() async {
     if (_prefs == null) await init();
-    return await _prefs!.remove(_tokenKey);
+    return await _prefs!.remove(_accessTokenKey);
+  }
+
+  /// 保存 refresh token
+  Future<bool> saveRefreshToken(String token) async {
+    if (_prefs == null) await init();
+    return await _prefs!.setString(_refreshTokenKey, token);
+  }
+
+  /// 获取 refresh token
+  Future<String?> getRefreshToken() async {
+    if (_prefs == null) await init();
+    return _prefs!.getString(_refreshTokenKey);
+  }
+
+  /// 删除 refresh token
+  Future<bool> removeRefreshToken() async {
+    if (_prefs == null) await init();
+    return await _prefs!.remove(_refreshTokenKey);
+  }
+
+  /// 删除所有 token
+  Future<void> clearTokens() async {
+    if (_prefs == null) await init();
+    await _prefs!.remove(_accessTokenKey);
+    await _prefs!.remove(_refreshTokenKey);
   }
 
   /// 清除所有数据

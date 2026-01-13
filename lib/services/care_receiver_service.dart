@@ -199,9 +199,17 @@ class CareReceiverService {
         careReceiverJson['gender'] = _mapGenderToInt(careReceiver.gender);
       }
 
-      // birth_date 转为 UTC 毫秒时间戳
-      if (careReceiver.birthDate != null) {
-        careReceiverJson['birth_date'] = careReceiver.birthDate! * 1000;
+      // birth_date 由 YYYY-MM-DD 转为 UTC 毫秒时间戳
+      final birthDateStr = careReceiver.birthDate;
+      if (birthDateStr != null && birthDateStr.isNotEmpty) {
+        try {
+          final parsed = DateTime.parse(birthDateStr).toUtc();
+          careReceiverJson['birth_date'] = parsed.millisecondsSinceEpoch;
+        } catch (_) {
+          careReceiverJson.remove('birth_date');
+        }
+      } else {
+        careReceiverJson.remove('birth_date');
       }
       
       final request = {

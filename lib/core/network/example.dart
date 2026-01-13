@@ -29,21 +29,19 @@ class NetworkExample {
       // 假设有一个 User 模型
       final response = await _httpClient.post<Map<String, dynamic>>(
         '/api/user/login',
-        data: {
-          'username': 'test@example.com',
-          'password': '123456',
-        },
+        data: {'username': 'test@example.com', 'password': '123456'},
         fromJson: (json) => json as Map<String, dynamic>,
       );
 
       if (response.isSuccess && response.data != null) {
         final userData = response.data!;
         print('登录成功: $userData');
-        
-        // 保存 token
-        final token = userData['token'] as String?;
-        if (token != null) {
-          _httpClient.setToken(token);
+
+        // 保存 accessToken（兼容字段名）
+        final accessToken =
+            userData['access_token'] as String? ?? userData['token'] as String?;
+        if (accessToken != null) {
+          _httpClient.setToken(accessToken);
         }
       }
     } on NetworkException catch (e) {
@@ -53,7 +51,7 @@ class NetworkExample {
 
   /// 示例 3: 带认证的请求
   Future<void> authenticatedRequestExample() async {
-    // 先设置 token
+    // 先设置 accessToken
     _httpClient.setToken('your_access_token_here');
 
     try {
@@ -71,10 +69,7 @@ class NetworkExample {
   Future<void> uploadFileExample(String filePath) async {
     try {
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(
-          filePath,
-          filename: 'avatar.jpg',
-        ),
+        'file': await MultipartFile.fromFile(filePath, filename: 'avatar.jpg'),
         'userId': '123',
       });
 
@@ -146,10 +141,7 @@ class NetworkExample {
     try {
       final response = await _httpClient.get(
         '/api/posts',
-        queryParameters: {
-          'page': 1,
-          'pageSize': 20,
-        },
+        queryParameters: {'page': 1, 'pageSize': 20},
       );
 
       if (response.isSuccess && response.data != null) {

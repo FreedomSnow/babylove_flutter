@@ -37,23 +37,33 @@ class _SplashPageState extends State<SplashPage> {
     }
 
     try {
-      // 从本地存储获取 token
-      final token = await StorageService().getToken();
+      // 从本地存储获取 refresh token
+      final refreshToken = await StorageService().getRefreshToken();
 
-      if (token == null || token.isEmpty) {
+      if (refreshToken == null || refreshToken.isEmpty) {
         // 没有 token，跳转到登录页
         _navigateToLogin();
         return;
       }
 
-      // 有 token，设置到 AuthService
       final authService = AuthService();
-      authService.setToken(token);
+      // 尝试刷新 token，失败则跳转登录页
+      final refreshed = await authService.refreshToken(refreshToken: refreshToken);
+      if (!refreshed.isSuccess) {
+        _navigateToLogin();
+        return;
+      }
 
-      // TODO: 可以在这里调用一个验证 token 的接口
+      // 有 token，设置到 AuthService
+      authService.setToken(refreshed.data?.accessToken ?? '');
+      StorageService().saveAccessToken(refreshed.data?.accessToken ?? '');
+      if (refreshed.data?.refreshToken.isNotEmpty == true) {
+        StorageService().saveRefreshToken(refreshed.data!.refreshToken);
+      }
+
       // 如果 token 有效，跳转到主页；否则跳转到登录页
       // 这里暂时假设 token 有效
-      
+
       // 检查 token 是否仍然有效
       if (authService.isLoggedIn()) {
         // 登录成功后，尝试加载用户相关的家庭数据并更新全局状态
@@ -67,9 +77,9 @@ class _SplashPageState extends State<SplashPage> {
               _isLoading = false;
               _loadFailed = true;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('获取数据失败')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('获取数据失败')));
           }
         }
       } else {
@@ -120,7 +130,7 @@ class _SplashPageState extends State<SplashPage> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // 应用名称
             const Text(
               '幼安管家',
@@ -130,9 +140,9 @@ class _SplashPageState extends State<SplashPage> {
                 color: Colors.black87,
               ),
             ),
-            
+
             const SizedBox(height: 48),
-            
+
             // 加载指示器 / 重试按钮
             if (_isLoading)
               const CircularProgressIndicator()
