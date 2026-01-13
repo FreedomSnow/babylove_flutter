@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:babylove_flutter/core/image_utils.dart';
 import 'package:babylove_flutter/core/network/network_exception.dart';
 import 'package:babylove_flutter/models/care_receiver_model.dart';
-import 'package:babylove_flutter/pages/main_page.dart';
+import 'package:babylove_flutter/pages/data_loading_page.dart';
 import 'package:babylove_flutter/services/app_state_service.dart';
 import 'package:babylove_flutter/services/care_receiver_service.dart';
+import 'package:babylove_flutter/widgets/asset_image_picker.dart';
 
 class CreateFamilyPage extends StatefulWidget {
   const CreateFamilyPage({super.key});
@@ -141,6 +143,18 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final familyName = _familyNameController.text.trim();
+    if (familyName.isEmpty) {
+      _showSnackBar('请填写家庭名称', Theme.of(context).colorScheme.error);
+      return;
+    }
+
+    final careNickname = _careNicknameController.text.trim();
+    if (careNickname.isEmpty) {
+      _showSnackBar('请填写被照顾者昵称', Theme.of(context).colorScheme.error);
+      return;
+    }
     if (_careGender == null || _careGender!.isEmpty) {
       _showSnackBar('请选择被照顾者性别', Theme.of(context).colorScheme.error);
       return;
@@ -157,17 +171,18 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
     try {
       final cr = CareReceiver(
         id: '',
-        name: _careNicknameController.text.trim(),
+        name: careNickname,
         gender: _careGender,
         birthDate: '${_careBirthDate!.year.toString().padLeft(4, '0')}-'
             '${_careBirthDate!.month.toString().padLeft(2, '0')}-'
             '${_careBirthDate!.day.toString().padLeft(2, '0')}',
         avatar: _careAvatarUrl,
       );
+      debugPrint('Creating family with care receiver: $cr');
 
       final svc = CareReceiverService();
       final resp = await svc.createFamilyWithCareReceiver(
-        familyName: _familyNameController.text.trim(),
+        familyName: familyName,
         familyAvatar: _familyAvatarUrl,
         myNickname: _myNicknameController.text.trim(),
         careReceiver: cr,
@@ -179,7 +194,7 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
         if (!mounted) return;
         _showSnackBar('创建家庭成功', Theme.of(context).colorScheme.primary);
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainPage()),
+          MaterialPageRoute(builder: (_) => const DataLoadingPage()),
           (route) => false,
         );
       } else {
@@ -198,17 +213,44 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
     }
   }
 
-  Widget _buildAvatarPlaceholder({required VoidCallback onTap}) {
+  Widget _buildAvatarPlaceholder({
+    required String? avatar,
+    required String defaultResource,
+    required VoidCallback onTap,
+  }) {
     final scheme = Theme.of(context).colorScheme;
+    final provider = AppImageUtils.imageProviderFor(avatar, defaultResource: defaultResource);
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(color: scheme.surfaceVariant, shape: BoxShape.circle),
-        child: Icon(Icons.add_photo_alternate, size: 28, color: scheme.onSurfaceVariant),
+      child: CircleAvatar(
+        radius: 28,
+        backgroundColor: scheme.surfaceVariant,
+        backgroundImage: provider,
+        child: provider == null ? Icon(Icons.add_photo_alternate, size: 28, color: scheme.onSurfaceVariant) : null,
       ),
     );
+  }
+
+  Future<void> _pickFamilyAvatar() async {
+    final resource = await showAssetImagePicker(
+      context,
+      subdir: 'family',
+      title: '选择家庭头像',
+      initialSelectedResource: _familyAvatarUrl,
+    );
+    if (!mounted || resource == null) return;
+    setState(() => _familyAvatarUrl = resource);
+  }
+
+  Future<void> _pickCareAvatar() async {
+    final resource = await showAssetImagePicker(
+      context,
+      subdir: 'dependent',
+      title: '选择被照顾者头像',
+      initialSelectedResource: _careAvatarUrl,
+    );
+    if (!mounted || resource == null) return;
+    setState(() => _careAvatarUrl = resource);
   }
 
   Widget _buildSectionHeader(String text) {
@@ -242,7 +284,9 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
               Row(
                 children: [
                   _buildAvatarPlaceholder(
-                    onTap: () => _showSnackBar('家庭头像上传功能开发中', Theme.of(context).colorScheme.primary),
+                    avatar: _familyAvatarUrl,
+                    defaultResource: 'resource:///family/family0.png',
+                    onTap: _pickFamilyAvatar,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -283,7 +327,9 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
               Row(
                 children: [
                   _buildAvatarPlaceholder(
-                    onTap: () => _showSnackBar('被照顾者头像上传功能开发中', Theme.of(context).colorScheme.primary),
+                    avatar: _careAvatarUrl,
+                    defaultResource: 'resource:///dependent/default.png',
+                    onTap: _pickCareAvatar,
                   ),
                   const SizedBox(width: 12),
                   Expanded(

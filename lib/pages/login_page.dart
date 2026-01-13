@@ -4,9 +4,9 @@ import 'package:babylove_flutter/services/auth_service.dart';
 import 'package:babylove_flutter/services/storage_service.dart';
 import 'package:babylove_flutter/services/app_state_service.dart';
 import 'package:babylove_flutter/core/network/network_exception.dart';
-import 'main_page.dart';
 import 'legal_document_page.dart';
 import 'welcome_page.dart';
+import 'data_loading_page.dart';
 
 /// 登录页面
 class LoginPage extends StatefulWidget {
@@ -104,7 +104,10 @@ class _LoginPageState extends State<LoginPage>
           _codeFocusNode.requestFocus();
         }
       } else {
-        _showSnackBar('发送失败: ${response.message}', Theme.of(context).colorScheme.error);
+        _showSnackBar(
+          '发送失败: ${response.message}',
+          Theme.of(context).colorScheme.error,
+        );
         // 发送失败时重置倒计时
         _timer?.cancel();
         setState(() {
@@ -158,7 +161,8 @@ class _LoginPageState extends State<LoginPage>
       debugPrint('Login response: $response');
       if (response.isSuccess && response.data != null) {
         // 保存 token 到本地
-        await StorageService().saveToken(response.data!.token);
+        await StorageService().saveAccessToken(response.data!.accessToken);
+        await StorageService().saveRefreshToken(response.data!.refreshToken);
 
         // 保存用户数据到全局状态
         final appState = AppStateService();
@@ -171,9 +175,9 @@ class _LoginPageState extends State<LoginPage>
         // 根据是否有家庭和护理对象决定跳转页面
         if (mounted) {
           if (appState.hasCompletedSetup) {
-            // 已有家庭和护理对象，跳转到主页
+            // 已有家庭和护理对象，跳转到数据加载页，由其统一拉取数据并进入主页
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const MainPage()),
+              MaterialPageRoute(builder: (context) => const DataLoadingPage()),
             );
           } else {
             // 没有家庭或护理对象，跳转到欢迎页
@@ -183,7 +187,10 @@ class _LoginPageState extends State<LoginPage>
           }
         }
       } else {
-        _showSnackBar('登录失败: ${response.message}', Theme.of(context).colorScheme.error);
+        _showSnackBar(
+          '登录失败: ${response.message}',
+          Theme.of(context).colorScheme.error,
+        );
       }
     } on NetworkException catch (e) {
       _showSnackBar('登录失败: ${e.message}', Theme.of(context).colorScheme.error);
@@ -384,16 +391,29 @@ class _LoginPageState extends State<LoginPage>
       width: double.infinity,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primary.withOpacity(0.06),
-        border: Border(top: BorderSide(color: Theme.of(context).dividerTheme.color ?? Theme.of(context).colorScheme.outlineVariant)),
+        border: Border(
+          top: BorderSide(
+            color:
+                Theme.of(context).dividerTheme.color ??
+                Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Icon(Icons.vpn_key, size: 20, color: Theme.of(context).colorScheme.primary),
+          Icon(
+            Icons.vpn_key,
+            size: 20,
+            color: Theme.of(context).colorScheme.primary,
+          ),
           const SizedBox(width: 8),
           Text(
             '收到验证码:',
-            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface),
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(

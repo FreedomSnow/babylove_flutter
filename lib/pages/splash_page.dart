@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:babylove_flutter/services/auth_service.dart';
 import 'package:babylove_flutter/services/storage_service.dart';
-import 'package:babylove_flutter/services/family_service.dart';
-import 'package:babylove_flutter/services/app_state_service.dart';
+import 'package:babylove_flutter/services/initial_load_service.dart';
 import 'login_page.dart';
 import 'main_page.dart';
 
@@ -38,27 +37,37 @@ class _SplashPageState extends State<SplashPage> {
     }
 
     try {
-      // 从本地存储获取 token
-      final token = await StorageService().getToken();
+      // 从本地存储获取 refresh token
+      final refreshToken = await StorageService().getRefreshToken();
 
-      if (token == null || token.isEmpty) {
+      if (refreshToken == null || refreshToken.isEmpty) {
         // 没有 token，跳转到登录页
         _navigateToLogin();
         return;
       }
 
-      // 有 token，设置到 AuthService
       final authService = AuthService();
-      authService.setToken(token);
+      // 尝试刷新 token，失败则跳转登录页
+      final refreshed = await authService.refreshToken(refreshToken: refreshToken);
+      if (!refreshed.isSuccess) {
+        _navigateToLogin();
+        return;
+      }
 
-      // TODO: 可以在这里调用一个验证 token 的接口
+      // 有 token，设置到 AuthService
+      authService.setToken(refreshed.data?.accessToken ?? '');
+      StorageService().saveAccessToken(refreshed.data?.accessToken ?? '');
+      if (refreshed.data?.refreshToken.isNotEmpty == true) {
+        StorageService().saveRefreshToken(refreshed.data!.refreshToken);
+      }
+
       // 如果 token 有效，跳转到主页；否则跳转到登录页
       // 这里暂时假设 token 有效
-      
+
       // 检查 token 是否仍然有效
       if (authService.isLoggedIn()) {
         // 登录成功后，尝试加载用户相关的家庭数据并更新全局状态
-        final ok = await _loadUserFamiliesAndData();
+        final ok = await InitialLoadService.loadUserFamiliesAndData();
         if (ok) {
           _navigateToHome();
         } else {
@@ -68,9 +77,9 @@ class _SplashPageState extends State<SplashPage> {
               _isLoading = false;
               _loadFailed = true;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('获取数据失败')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('获取数据失败')));
           }
         }
       } else {
@@ -82,44 +91,7 @@ class _SplashPageState extends State<SplashPage> {
     }
   }
 
-  /// 通用方法：获取我的家庭并根据 lastFamily 加载家庭数据，更新 AppStateService
-  /// 返回 true 表示全部成功，false 表示任一步骤失败
-  Future<bool> _loadUserFamiliesAndData() async {
-    try {
-      final familyService = FamilyService();
-      final appState = AppStateService();
-
-      // 1. 获取我的家庭列表
-      final familiesResp = await familyService.getMyFamilies();
-      if (!familiesResp.isSuccess) {
-        return false;
-      }
-
-      final families = familiesResp.data ?? [];
-      appState.setMyFamilies(families);
-
-      // 2. 如果有最近使用的家庭，则加载该家庭的成员和被照顾者数据
-      if (appState.lastFamily != null) {
-        final lastFamily = appState.lastFamily!;
-        final dataResp = await familyService.loadFamilyData(familyId: lastFamily.id);
-        if (!dataResp.isSuccess) {
-          return false;
-        }
-
-        final fd = dataResp.data!;
-        appState.updateFamilyMembersAndCareReceivers(
-          familyId: lastFamily.id,
-          careReceivers: fd.careReceivers,
-          members: fd.members,
-        );
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Error loading families/data: $e');
-      return false;
-    }
-  }
+  // 数据加载逻辑已提取为 InitialLoadService.loadUserFamiliesAndData()
 
   /// 跳转到登录页
   void _navigateToLogin() {
@@ -158,7 +130,7 @@ class _SplashPageState extends State<SplashPage> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // 应用名称
             const Text(
               '幼安管家',
@@ -168,9 +140,9 @@ class _SplashPageState extends State<SplashPage> {
                 color: Colors.black87,
               ),
             ),
-            
+
             const SizedBox(height: 48),
-            
+
             // 加载指示器 / 重试按钮
             if (_isLoading)
               const CircularProgressIndicator()

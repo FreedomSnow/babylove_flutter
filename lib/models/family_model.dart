@@ -6,7 +6,12 @@ class Family {
   final String id;
   final String name;
   final String? avatar;
-  final String? role;
+  /// 角色类型，可能值：
+  /// - 'primary_caregiver' 管理员
+  /// - 'assistant_caregiver' 监管者
+  /// - 'caregiver' 执行者
+  /// - 'visitor' 访客（默认）
+  final String role;
   final String? myNickname;
   final String status;
   final String? creatorId;
@@ -21,7 +26,7 @@ class Family {
     required this.id,
     required this.name,
     this.avatar,
-    this.role,
+    String? role,
     this.myNickname,
     required this.status,
     this.creatorId,
@@ -30,17 +35,24 @@ class Family {
     CareReceiver? lastCareReceiverParam,
     List<CareReceiver>? careReceiversParam,
     List<FamilyMember>? membersParam,
-  }) : careReceiverIds = careReceiverIds ?? [],
+  }) : role = role ?? 'visitor',
+       careReceiverIds = careReceiverIds ?? [],
        lastCareReceiver = lastCareReceiverParam,
        careReceivers = careReceiversParam ?? [],
        members = membersParam ?? [];
+       
 
   /// 从 JSON 创建实例
   factory Family.fromJson(Map<String, dynamic> json) {
+    final String? avatarRaw = json['avatar'] as String?;
+    final String avatarValue = (avatarRaw != null && avatarRaw.trim().isNotEmpty)
+        ? avatarRaw
+        : 'resource:///family/family0.png';
+
     return Family(
       id: json['id']?.toString() ?? '',
       name: json['name'] as String? ?? '',
-      avatar: json['avatar'] as String?,
+      avatar: avatarValue,
       role: json['role'] as String?,
       myNickname: json['my_nickname'] as String?,
       status: json['status'] as String? ?? '',
@@ -58,7 +70,7 @@ class Family {
       'id': id,
       'name': name,
       if (avatar != null) 'avatar': avatar,
-      if (role != null) 'role': role,
+      'role': role,
       if (myNickname != null) 'my_nickname': myNickname,
       'status': status,
       if (creatorId != null) 'creator_id': creatorId,
@@ -66,6 +78,17 @@ class Family {
       'care_receiver_ids': careReceiverIds,
     };
   }
+
+  // 角色常量
+  static const String ROLE_PRIMARY_CAREGIVER = 'primary_caregiver';
+  static const String ROLE_ASSISTANT_CAREGIVER = 'assistant_caregiver';
+  static const String ROLE_CAREGIVER = 'caregiver';
+  static const String ROLE_VISITOR = 'visitor';
+
+  bool get isPrimaryCaregiver => role == ROLE_PRIMARY_CAREGIVER;
+  bool get isAssistantCaregiver => role == ROLE_ASSISTANT_CAREGIVER;
+  bool get isCaregiver => role == ROLE_CAREGIVER;
+  bool get isVisitor => role == ROLE_VISITOR;
 
   @override
   String toString() {

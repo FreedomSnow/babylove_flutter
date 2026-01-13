@@ -91,7 +91,7 @@ class SettingsPage extends StatelessWidget {
     if (confirm == true && context.mounted) {
       try {
         await AuthService().logout();
-        await StorageService().removeToken();
+        await StorageService().clearTokens();
         
         if (context.mounted) {
           Navigator.of(context).pushAndRemoveUntil(

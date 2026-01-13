@@ -4,6 +4,9 @@ import 'care_receiver_model.dart';
 
 /// 登录响应数据模型
 class LoginResponseData {
+  final String accessToken;
+  final String refreshToken;
+  // 保留旧字段，内部与 accessToken 对齐，便于兼容旧调用方
   final String token;
   final User user;
   final bool isNewUser;
@@ -11,6 +14,8 @@ class LoginResponseData {
   final CareReceiver? lastCareReceiver;
 
   LoginResponseData({
+    required this.accessToken,
+    required this.refreshToken,
     required this.token,
     required this.user,
     required this.isNewUser,
@@ -20,8 +25,13 @@ class LoginResponseData {
 
   /// 从 JSON 创建实例
   factory LoginResponseData.fromJson(Map<String, dynamic> json) {
+    final parsedAccessToken =
+        (json['access_token'] as String?) ?? (json['token'] as String?) ?? '';
     return LoginResponseData(
-      token: json['token'] as String? ?? '',
+      accessToken: parsedAccessToken,
+      refreshToken: json['refresh_token'] as String? ?? '',
+      // token 与 accessToken 对齐，避免旧代码拿到空值
+      token: parsedAccessToken,
       user: User.fromJson(json['user'] as Map<String, dynamic>? ?? {}),
       isNewUser: json['isNewUser'] as bool? ?? false,
       lastFamily: json['last_family'] != null
@@ -29,7 +39,8 @@ class LoginResponseData {
           : null,
       lastCareReceiver: json['last_care_receiver'] != null
           ? CareReceiver.fromJson(
-              json['last_care_receiver'] as Map<String, dynamic>)
+              json['last_care_receiver'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
@@ -37,6 +48,8 @@ class LoginResponseData {
   /// 转换为 JSON
   Map<String, dynamic> toJson() {
     return {
+      'access_token': accessToken,
+      'refresh_token': refreshToken,
       'token': token,
       'user': user.toJson(),
       'isNewUser': isNewUser,
@@ -47,7 +60,7 @@ class LoginResponseData {
 
   @override
   String toString() {
-    return 'LoginResponseData(token: $token, user: $user, isNewUser: $isNewUser)';
+    return 'LoginResponseData(accessToken: $accessToken, refreshToken: $refreshToken, user: $user, isNewUser: $isNewUser)';
   }
 }
 
@@ -65,11 +78,7 @@ class LoginRequest {
 
   /// 转换为 JSON
   Map<String, dynamic> toJson() {
-    return {
-      'phone': phone,
-      'code': code,
-      'nickname': nickname,
-    };
+    return {'phone': phone, 'code': code, 'nickname': nickname};
   }
 }
 
@@ -77,15 +86,11 @@ class LoginRequest {
 class SendSmsRequest {
   final String phone;
 
-  SendSmsRequest({
-    required this.phone,
-  });
+  SendSmsRequest({required this.phone});
 
   /// 转换为 JSON
   Map<String, dynamic> toJson() {
-    return {
-      'phone': phone,
-    };
+    return {'phone': phone};
   }
 }
 
@@ -94,10 +99,7 @@ class SendSmsResponseData {
   final String? code;
   final String? description;
 
-  SendSmsResponseData({
-    this.code,
-    this.description,
-  });
+  SendSmsResponseData({this.code, this.description});
 
   /// 从 JSON 创建实例
   factory SendSmsResponseData.fromJson(Map<String, dynamic> json) {

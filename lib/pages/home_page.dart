@@ -73,7 +73,7 @@ class HomePage extends StatelessWidget {
       await authService.logout();
 
       // 清除本地存储的 token
-      await StorageService().removeToken();
+      await StorageService().clearTokens();
 
       // 关闭加载对话框
       if (context.mounted) {
