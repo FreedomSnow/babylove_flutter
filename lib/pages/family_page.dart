@@ -121,18 +121,17 @@ class _FamilyPageState extends State<FamilyPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
-            child: TextButton.icon(
+            child: TextButton(
               onPressed: () async {
                 final joined = await showJoinFamilyDialog(context);
                 if (joined) {
                   _loadFamiliesFromState();
                 }
               },
-              icon: const Icon(Icons.group_add, color: Colors.white),
-              label: const Text('加入家庭', style: TextStyle(color: Colors.white)),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
               ),
+              child: const Text('加入家庭', style: TextStyle(color: Colors.white)),
             ),
           ),
         ],

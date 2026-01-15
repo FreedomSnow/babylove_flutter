@@ -102,12 +102,19 @@ class CareReceiver {
   factory CareReceiver.fromJson(Map<String, dynamic> json) {
     // 解析 birth_date：从 UTC 毫秒时间转换为 YYYY-MM-DD 格式
     String? birthDateStr;
-    final birthDateMs = json['birth_date'] as int?;
+    final birthDateRaw = json['birth_date'];
+    int? birthDateMs;
+    if (birthDateRaw is int) {
+      birthDateMs = birthDateRaw;
+    } else if (birthDateRaw is String) {
+      birthDateMs = int.tryParse(birthDateRaw);
+    } else {
+      birthDateMs = null;
+    }
+
     if (birthDateMs != null) {
       final dateTime = DateTime.fromMillisecondsSinceEpoch(birthDateMs);
-      birthDateStr = '${dateTime.year.toString().padLeft(4, '0')}-'
-          '${dateTime.month.toString().padLeft(2, '0')}-'
-          '${dateTime.day.toString().padLeft(2, '0')}';
+      birthDateStr = AppUtils.toYMD(dateTime);
     }
 
     final String? avatarRaw = json['avatar'] as String?;
@@ -118,7 +125,12 @@ class CareReceiver {
     return CareReceiver(
       id: json['id']?.toString() ?? '',
       name: json['name'] as String? ?? '',
-      gender: AppUtils.getGenderTextFromInt(json['gender'] as int?),
+      gender: AppUtils.getGenderTextFromInt(() {
+        final g = json['gender'];
+        if (g is int) return g;
+        if (g is String) return int.tryParse(g);
+        return null;
+      }()),
       birthDate: birthDateStr,
       avatar: avatarValue,
       residence: json['residence'] as String?,
@@ -143,12 +155,7 @@ class CareReceiver {
 
   /// 将 birthDate (YYYY-MM-DD 格式的字符串) 转换为 DateTime
   DateTime? get birthDateAsDateTime {
-    if (birthDate == null) return null;
-    try {
-      return DateTime.parse(birthDate!);
-    } catch (e) {
-      return null;
-    }
+    return AppUtils.fromYMD(birthDate);
   }
 
   /// 转换为 JSON
@@ -157,10 +164,9 @@ class CareReceiver {
     int birthDateMs = 0;
     if (birthDate != null) {
       try {
-        final dateTime = DateTime.parse(birthDate!);
-        birthDateMs = dateTime.millisecondsSinceEpoch;
+        final dateTime = AppUtils.fromYMD(birthDate!);
+        if (dateTime != null) birthDateMs = dateTime.toUtc().millisecondsSinceEpoch;
       } catch (e) {
-        // 解析失败则保持为 null
         birthDateMs = 0;
       }
     }

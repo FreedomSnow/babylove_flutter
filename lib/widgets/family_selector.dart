@@ -77,9 +77,10 @@ class _FamilySelectorState extends State<FamilySelector> {
   }
 
   void _showFamilyPicker() {
+    final parentContext = context;
     showModalBottomSheet(
       context: context,
-      builder: (context) {
+      builder: (sheetContext) {
         final families = _appState.myFamilies;
         return ListView.builder(
           shrinkWrap: true,
@@ -111,18 +112,18 @@ class _FamilySelectorState extends State<FamilySelector> {
                   : null,
               selected: isSelected,
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
 
                 // 显示 loading 对话框
                 showDialog(
-                  context: context,
+                  context: parentContext,
                   barrierDismissible: false,
                   builder: (ctx) => const Center(child: CircularProgressIndicator()),
                 );
 
                 try {
                   final resp = await _familyService.switchFamily(familyId: family.id);
-                  if (mounted) Navigator.of(context).pop(); // 关闭 loading
+                  if (mounted) Navigator.of(parentContext).pop(); // 关闭 loading
 
                   if (resp.isSuccess && resp.data != null) {
                     final switchedFamily = resp.data!;
@@ -149,14 +150,14 @@ class _FamilySelectorState extends State<FamilySelector> {
                           }
                         } else {
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            ScaffoldMessenger.of(parentContext).showSnackBar(
                               SnackBar(content: Text('加载家庭数据失败: ${loadResp.message ?? '未知错误'}')),
                             );
                           }
                         }
                       } catch (e) {
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          ScaffoldMessenger.of(parentContext).showSnackBar(
                             SnackBar(content: Text('加载家庭数据异常: $e')),
                           );
                         }
@@ -184,7 +185,7 @@ class _FamilySelectorState extends State<FamilySelector> {
                       _currentCareReceiver = _appState.lastCareReceiver;
                     });
 
-                    final provider = context.read<AppStateProvider>();
+                    final provider = parentContext.read<AppStateProvider>();
                     if (_currentFamily != null) {
                       provider.updateFamilyAndCareReceiver(
                         _currentFamily!.id,
@@ -195,15 +196,15 @@ class _FamilySelectorState extends State<FamilySelector> {
                     widget.onChanged?.call();
                   } else {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      ScaffoldMessenger.of(parentContext).showSnackBar(
                         SnackBar(content: Text('切换家庭失败: ${resp.message ?? '未知错误'}')),
                       );
                     }
                   }
                 } catch (e) {
                   if (mounted) {
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    Navigator.of(parentContext).pop();
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
                       SnackBar(content: Text('切换家庭异常: $e')),
                     );
                   }
@@ -217,16 +218,17 @@ class _FamilySelectorState extends State<FamilySelector> {
   }
 
   void _showCareReceiverPicker() {
+    final parentContext = context;
     if (_currentFamily == null || _currentFamily!.careReceivers.isEmpty) {
       ScaffoldMessenger.of(
-        context,
+        parentContext,
       ).showSnackBar(SnackBar(content: Text(_currentFamily == null ? '没有选中家庭' : '当前家庭没有被照顾者')));
       return;
     }
 
     showModalBottomSheet(
       context: context,
-      builder: (context) {
+      builder: (sheetContext) {
         return ListView.builder(
           shrinkWrap: true,
           itemCount: _currentFamily!.careReceivers.length,
@@ -262,11 +264,11 @@ class _FamilySelectorState extends State<FamilySelector> {
                   : null,
               selected: isSelected,
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
 
                 // 显示 loading
                 showDialog(
-                  context: context,
+                  context: parentContext,
                   barrierDismissible: false,
                   builder: (ctx) => const Center(child: CircularProgressIndicator()),
                 );
@@ -278,7 +280,7 @@ class _FamilySelectorState extends State<FamilySelector> {
                     careReceiverId: careReceiver.id,
                   );
 
-                  if (mounted) Navigator.of(context).pop(); // 关闭 loading
+                  if (mounted) Navigator.of(parentContext).pop(); // 关闭 loading
 
                   if (resp.isSuccess && resp.data != null) {
                     final data = resp.data!;
@@ -294,7 +296,7 @@ class _FamilySelectorState extends State<FamilySelector> {
                     });
 
                     // 通知 Provider
-                    final provider = context.read<AppStateProvider>();
+                    final provider = parentContext.read<AppStateProvider>();
                     provider.updateFamilyAndCareReceiver(
                       _currentFamily!.id,
                       _currentCareReceiver?.id,
@@ -303,15 +305,15 @@ class _FamilySelectorState extends State<FamilySelector> {
                     widget.onChanged?.call();
                   } else {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      ScaffoldMessenger.of(parentContext).showSnackBar(
                         SnackBar(content: Text('切换被照顾者失败: ${resp.message ?? '未知错误'}')),
                       );
                     }
                   }
                 } catch (e) {
                   if (mounted) {
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    Navigator.of(parentContext).pop();
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
                       SnackBar(content: Text('切换被照顾者异常: $e')),
                     );
                   }

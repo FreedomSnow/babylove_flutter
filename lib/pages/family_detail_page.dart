@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/image_utils.dart';
+import '../core/utils.dart';
 import '../widgets/asset_image_picker.dart';
 import '../models/care_receiver_model.dart';
 import '../models/family_model.dart';
@@ -31,7 +32,6 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
 
   // 当前用户在该家庭中的成员对象（若存在）
   FamilyMember? _myMember;
-  String? _editedMyNickname;
 
   @override
   void initState() {
@@ -45,7 +45,6 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
     if (currentUserId != null) {
       try {
         _myMember = widget.family.members.firstWhere((m) => m.userId == currentUserId);
-        _editedMyNickname = _myMember?.nickname;
       } catch (_) {
         _myMember = null;
       }
@@ -82,12 +81,9 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
       } else {
         // 处理错误
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response.message ?? '加载数据失败'),
-            backgroundColor: Colors.red,
-          ),
-        );
+          final msg = response.message ?? '加载数据失败';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red,));
+          _showErrorDialog(msg);
         setState(() {
           _isLoading = false;
         });
@@ -100,6 +96,8 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
           backgroundColor: Colors.red,
         ),
       );
+        final msg = '加载数据失败: ${e.toString()}';
+        _showErrorDialog(msg);
       setState(() {
         _isLoading = false;
       });
@@ -150,10 +148,14 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已退出家庭')));
         Navigator.of(context).pop();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '退出失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '退出失败';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+        _showErrorDialog(msg);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('退出失败: ${e.toString()}'), backgroundColor: Colors.red));
+      final msg = '退出失败: ${e.toString()}';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      _showErrorDialog(msg);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -184,10 +186,14 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('家庭已销毁')));
         Navigator.of(context).pop();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '销毁失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '销毁失败';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+        _showErrorDialog(msg);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('销毁失败: ${e.toString()}'), backgroundColor: Colors.red));
+      final msg = '销毁失败: ${e.toString()}';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      _showErrorDialog(msg);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -238,10 +244,14 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
         _updateAppState();
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('成员角色已修改')));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '修改失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '修改失败';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+        _showErrorDialog(msg);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('修改失败: ${e.toString()}'), backgroundColor: Colors.red));
+      final msg = '修改失败: ${e.toString()}';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      _showErrorDialog(msg);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -280,10 +290,14 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
         _updateAppState();
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('成员已移除')));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '移除失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '移除失败';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+        _showErrorDialog(msg);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('移除失败: ${e.toString()}'), backgroundColor: Colors.red));
+      final msg = '移除失败: ${e.toString()}';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      _showErrorDialog(msg);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -304,18 +318,6 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
     );
   }
 
-  String _getRoleText(String role) {
-    switch (role) {
-      case 'owner':
-        return '创建者';
-      case 'admin':
-        return '管理员';
-      case 'member':
-        return '成员';
-      default:
-        return '未知';
-    }
-  }
 
   void _addCareReceiver() {
     ScaffoldMessenger.of(
@@ -327,6 +329,19 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
   }
 
+  void _showErrorDialog(String message) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('错误'),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('确定')),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleFamilyInfoTap() async {
     if (!_isPrimary) {
       return;
@@ -334,8 +349,8 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
 
     final nameController = TextEditingController(text: _displayFamilyName);
     String? tempAvatar = _displayFamilyAvatar;
-
-    final result = await showModalBottomSheet<Map<String, String?>>(
+    
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
@@ -395,11 +410,39 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(ctx).pop({
-                              'name': nameController.text.trim(),
-                              'avatar': tempAvatar,
-                            });
+                          onPressed: () async {
+                            final newName = nameController.text.trim();
+                            final newAvatar = tempAvatar;
+                            if (newName.isEmpty) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('家庭名称不能为空'), backgroundColor: Colors.red));
+                              return;
+                            }
+
+                            // 若名称与头像均未变化，则直接关闭编辑页
+                            if (newName == _displayFamilyName && (newAvatar ?? '') == (_displayFamilyAvatar ?? '')) {
+                              Navigator.of(ctx).pop();
+                              return;
+                            }
+
+                            // 显示全屏半透明 overlay
+                            showDialog(
+                              context: ctx,
+                              barrierDismissible: false,
+                              barrierColor: Colors.black.withOpacity(0.4),
+                              builder: (dCtx) => const Center(child: CircularProgressIndicator()),
+                            );
+
+                            final success = await _updateFamilyInfo(newName, newAvatar);
+
+                            // 关闭 overlay（对话框通常是挂载在根 Navigator 上）
+                            if (Navigator.of(context, rootNavigator: true).canPop()) {
+                              Navigator.of(context, rootNavigator: true).pop();
+                            }
+
+                            if (success) {
+                              // 保存成功后关闭编辑页（关闭 bottom sheet）
+                              if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+                            }
                           },
                           child: const Text('保存'),
                         ),
@@ -413,31 +456,13 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
         );
       },
     );
-
-    if (result == null) return;
-
-    final newName = result['name']?.trim() ?? '';
-    final newAvatar = result['avatar'];
-    if (newName.isEmpty) {
-      _showErrorMessage('家庭名称不能为空');
-      return;
-    }
-
-    // 若名称与头像均未变化，则不调用更新，仅关闭编辑页
-    if (newName == _displayFamilyName && (newAvatar ?? '') == (_displayFamilyAvatar ?? '')) {
-      return;
-    }
-
-    await _updateFamilyInfo(newName, newAvatar);
   }
 
-  Future<void> _updateFamilyInfo(String newName, String? newAvatar) async {
-    // 若内容未变，直接返回（调用方的编辑页已关闭）
+  /// 更新家庭信息，返回是否成功（不自动关闭编辑页）
+  Future<bool> _updateFamilyInfo(String newName, String? newAvatar) async {
     if (newName == _displayFamilyName && (newAvatar ?? '') == (_displayFamilyAvatar ?? '')) {
-      return;
+      return true;
     }
-
-    setState(() => _isLoading = true);
 
     try {
       final resp = await _familyService.updateFamily(
@@ -447,33 +472,63 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
       );
 
       if (resp.isSuccess) {
+        if (!mounted) return true;
         setState(() {
           _displayFamilyName = resp.data?.name ?? newName;
           _displayFamilyAvatar = resp.data?.avatar ?? newAvatar;
-          _isLoading = false;
         });
+
+        // 更新 AppStateService 中对应的 family 信息（若存在于缓存中）
+        final appState = AppStateService();
+        final updatedFamily = resp.data;
+        if (updatedFamily != null) {
+          // 更新 lastFamily
+          if (appState.lastFamily?.id == updatedFamily.id) {
+            updatedFamily.lastCareReceiver = appState.lastFamily?.lastCareReceiver;
+            updatedFamily.careReceivers = appState.lastFamily?.careReceivers ?? [];
+            updatedFamily.members = appState.lastFamily?.members ?? [];
+            appState.setLastFamily(updatedFamily);
+          }
+
+          // 更新 myFamilies 列表中的该家庭
+          final families = appState.myFamilies;
+          final idx = families.indexWhere((f) => f.id == updatedFamily.id);
+          if (idx >= 0) {
+            final foundFamily = families[idx];
+            updatedFamily.lastCareReceiver = foundFamily.lastCareReceiver;
+            updatedFamily.careReceivers = foundFamily.careReceivers;
+            updatedFamily.members = foundFamily.members;
+            families[idx] = updatedFamily;
+            appState.setMyFamilies(families);
+          }
+        }
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('家庭信息已保存')));
+        return true;
       } else {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '保存失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '保存失败';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+        _showErrorDialog(msg);
+        return false;
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败: ${e.toString()}'), backgroundColor: Colors.red),
-      );
+      if (!mounted) return false;
+      final msg = '保存失败: ${e.toString()}';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      _showErrorDialog(msg);
+      return false;
     }
   }
 
-  Future<void> _updateMyNickname(String newNickname) async {
-    if (_myMember == null) return;
+  /// 更新当前用户昵称，返回是否成功（不自动关闭编辑页）
+  Future<bool> _updateMyNickname(String newNickname) async {
+    if (_myMember == null) return false;
     if (newNickname.trim().isEmpty) {
       _showErrorMessage('昵称不能为空');
-      return;
+      return false;
     }
 
-    setState(() => _isLoading = true);
+    debugPrint('Updating my nickname to: $newNickname');
+
     try {
       final resp = await _familyService.updateMyNickname(
         familyId: widget.family.id,
@@ -481,114 +536,298 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
       );
       if (resp.isSuccess) {
         final updated = resp.data!;
-        final idx = widget.family.members.indexWhere((m) => m.id == updated.id);
-        if (idx >= 0) {
-          widget.family.members[idx] = updated;
+        // 更新页面显示以及本地缓存
+        if (mounted) {
+          setState(() {
+            final idx = widget.family.members.indexWhere((m) => m.id == updated.id);
+            if (idx >= 0) {
+              widget.family.members[idx] = updated;
+            }
+            _myMember = updated;
+          });
         }
-        _myMember = updated;
-        _editedMyNickname = updated.nickname;
+
+        // 如果当前登录用户与该 member 对应，则同步更新 AppStateService 中的 currentUser
+        if (_appState.currentUser != null && _appState.currentUser!.id == updated.userId) {
+          final newUser = _appState.currentUser!.copyWith(nickname: updated.nickname);
+          _appState.setCurrentUser(newUser);
+        }
+
+        // 更新 app 全局里的家庭成员缓存
         _updateAppState();
+
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('我的昵称已保存')));
+        return true;
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '保存失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '保存失败';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+        _showErrorDialog(msg);
+        return false;
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败: ${e.toString()}'), backgroundColor: Colors.red),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (!mounted) return false;
+      final msg = '保存失败: ${e.toString()}';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      _showErrorDialog(msg);
+      return false;
     }
   }
 
   Future<void> _handleCareReceiverTap(CareReceiver careReceiver) async {
     if (!_isPrimary) {
-      _showErrorMessage('仅家庭主负责人可编辑被照顾者');
+      _showErrorMessage('仅家庭管理员可编辑被照顾者');
       return;
     }
 
-    final controller = TextEditingController(text: careReceiver.name);
-    final result = await showModalBottomSheet<String>(
+    final nameController = TextEditingController(text: careReceiver.name);
+    String? tempAvatar = careReceiver.avatar;
+    String? selectedGender = careReceiver.gender;
+    DateTime? selectedBirthDate = careReceiver.birthDateAsDateTime;
+
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
         return Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('编辑被照顾者', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(labelText: '昵称'),
+          child: StatefulBuilder(
+            builder: (ctx, setModalState) {
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('编辑被照顾者', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          InkWell(
+                            onTap: () async {
+                              final resource = await showAssetImagePicker(
+                                context,
+                                subdir: 'dependent',
+                                title: '选择头像',
+                                initialSelectedResource: tempAvatar,
+                              );
+                              if (resource != null) setModalState(() => tempAvatar = resource);
+                            },
+                            child: CircleAvatar(
+                              radius: 32,
+                              backgroundImage: AppImageUtils.imageProviderFor(
+                                tempAvatar,
+                                defaultResource: 'resource:///dependent/default.png',
+                              ),
+                              child: AppImageUtils.imageProviderFor(
+                                        tempAvatar,
+                                        defaultResource: 'resource:///dependent/default.png',
+                                      ) ==
+                                      null
+                                  ? const Icon(Icons.person, size: 32)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: nameController,
+                              decoration: const InputDecoration(labelText: '昵称'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 性别选择
+                      Row(
+                        children: [
+                          const Text('性别：', style: TextStyle(fontSize: 14)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: RadioListTile<String?>(
+                                    title: const Text('男'),
+                                    value: '男',
+                                    groupValue: selectedGender,
+                                    onChanged: (v) => setModalState(() => selectedGender = v),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: RadioListTile<String?>(
+                                    title: const Text('女'),
+                                    value: '女',
+                                    groupValue: selectedGender,
+                                    onChanged: (v) => setModalState(() => selectedGender = v),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // 出生日期选择
+                      Row(
+                        children: [
+                          const Text('出生：', style: TextStyle(fontSize: 14)),
+                          const SizedBox(width: 12),
+                          TextButton(
+                            onPressed: () async {
+                              final now = DateTime.now();
+                              final first = DateTime(now.year - 120);
+                              final last = now;
+                              final picked = await showDatePicker(
+                                context: ctx,
+                                initialDate: selectedBirthDate ?? DateTime(now.year - 30),
+                                firstDate: first,
+                                lastDate: last,
+                              );
+                              if (picked != null) setModalState(() => selectedBirthDate = picked);
+                            },
+                            child: Text(selectedBirthDate == null ? '未设置' : AppUtils.toYMD(selectedBirthDate!)),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final newName = nameController.text.trim();
+                            if (newName.isEmpty) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('昵称不能为空'), backgroundColor: Colors.red));
+                              return;
+                            }
+
+                            // 若全部字段未变化则关闭
+                            final unchanged = newName == careReceiver.name &&
+                                (tempAvatar ?? '') == (careReceiver.avatar ?? '') &&
+                                (selectedGender ?? '') == (careReceiver.gender ?? '') &&
+                                (selectedBirthDate == careReceiver.birthDateAsDateTime);
+                            if (unchanged) {
+                              Navigator.of(ctx).pop();
+                              return;
+                            }
+
+                            // 显示全屏半透明 overlay
+                            showDialog(
+                              context: ctx,
+                              barrierDismissible: false,
+                              barrierColor: Colors.black.withOpacity(0.4),
+                              builder: (dCtx) => const Center(child: CircularProgressIndicator()),
+                            );
+
+                            final updated = CareReceiver(
+                              id: careReceiver.id,
+                              name: newName,
+                              gender: selectedGender,
+                              birthDate: selectedBirthDate == null ? null : AppUtils.toYMD(selectedBirthDate!),
+                              avatar: tempAvatar,
+                              residence: careReceiver.residence,
+                              phone: careReceiver.phone,
+                              emergencyContact: careReceiver.emergencyContact,
+                              medicalHistory: careReceiver.medicalHistory,
+                              allergies: careReceiver.allergies,
+                              remark: careReceiver.remark,
+                              customFields: careReceiver.customFields,
+                            );
+
+                            final success = await _updateCareReceiver(careReceiver, updated);
+
+                            // 关闭 overlay（对话框通常是挂载在根 Navigator 上）
+                            if (Navigator.of(context, rootNavigator: true).canPop()) {
+                              Navigator.of(context, rootNavigator: true).pop();
+                            }
+
+                            if (success) {
+                              // 保存成功后关闭编辑页（关闭 bottom sheet）
+                              if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+                            }
+                          },
+                          child: const Text('保存'),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-                      child: const Text('保存'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         );
       },
     );
-
-    if (result == null || result.isEmpty) return;
-    await _updateCareReceiver(careReceiver, result);
   }
 
-  Future<void> _updateCareReceiver(CareReceiver careReceiver, String newName) async {
-    setState(() => _isLoading = true);
+  /// 更新被照顾者，返回是否成功（不自动关闭编辑页）
+  Future<bool> _updateCareReceiver(CareReceiver original, CareReceiver updated) async {
     try {
-      final updated = CareReceiver(
-        id: careReceiver.id,
-        name: newName,
-        gender: careReceiver.gender,
-        birthDate: careReceiver.birthDate,
-        avatar: careReceiver.avatar,
-        residence: careReceiver.residence,
-        phone: careReceiver.phone,
-        emergencyContact: careReceiver.emergencyContact,
-        medicalHistory: careReceiver.medicalHistory,
-        allergies: careReceiver.allergies,
-        remark: careReceiver.remark,
-        customFields: careReceiver.customFields,
-      );
-
       final resp = await _careReceiverService.updateCareReceiver(
         familyId: widget.family.id,
-        careReceiverId: careReceiver.id,
+        careReceiverId: original.id,
         careReceiver: updated,
       );
 
       if (resp.isSuccess) {
-        final idx = widget.family.careReceivers.indexWhere((c) => c.id == careReceiver.id);
-        if (idx >= 0) {
-          widget.family.careReceivers[idx] = resp.data!;
+        if (mounted) {
+          setState(() {
+            final idx = widget.family.careReceivers.indexWhere((c) => c.id == original.id);
+            if (idx >= 0) {
+              widget.family.careReceivers[idx] = resp.data!;
+            }
+          });
         }
-        _updateAppState();
+
+        // 同步更新 AppStateService 中缓存的家庭数据（lastFamily 与 myFamilies）
+        final appState = AppStateService();
+        final updatedCare = resp.data!;
+
+        // 更新 lastFamily 中的被照顾者列表
+        final lastFamily = appState.lastFamily;
+        if (lastFamily != null && lastFamily.id == widget.family.id) {
+          if (lastFamily.lastCareReceiver?.id == updatedCare.id) {
+            lastFamily.lastCareReceiver = updatedCare;
+          }
+
+          final cIdx = lastFamily.careReceivers.indexWhere((c) => c.id == updatedCare.id);
+          if (cIdx >= 0) {
+            lastFamily.careReceivers[cIdx] = updatedCare;
+            appState.setLastFamily(lastFamily);
+          }
+        }
+
+        // 更新 myFamilies 列表中的对应家庭
+        final families = appState.myFamilies;
+        final fIdx = families.indexWhere((f) => f.id == widget.family.id);
+        if (fIdx >= 0) {
+          final found = families[fIdx];
+          final ccIdx = found.careReceivers.indexWhere((c) => c.id == updatedCare.id);
+          if (ccIdx >= 0) {
+            found.careReceivers[ccIdx] = updatedCare;
+            families[fIdx] = found;
+            appState.setMyFamilies(families);
+          }
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('被照顾者信息已保存')));
+        return true;
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '保存失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '保存失败';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+        _showErrorDialog(msg);
+        return false;
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败: ${e.toString()}'), backgroundColor: Colors.red),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (!mounted) return false;
+      final msg = '保存失败: ${e.toString()}';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      _showErrorDialog(msg);
+      return false;
     }
   }
 
@@ -596,7 +835,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
     final isMe = member.userId == _appState.currentUser?.id;
     if (isMe) {
       final controller = TextEditingController(text: member.nickname);
-      final result = await showModalBottomSheet<String>(
+      await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         builder: (ctx) {
@@ -619,7 +858,37 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+                        onPressed: () async {
+                          final newNick = controller.text.trim();
+                          if (newNick.isEmpty) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('昵称不能为空'), backgroundColor: Colors.red));
+                            return;
+                          }
+
+                          if (newNick == member.nickname) {
+                            Navigator.of(ctx).pop();
+                            return;
+                          }
+
+                          showDialog(
+                            context: ctx,
+                            barrierDismissible: false,
+                            barrierColor: Colors.black.withOpacity(0.4),
+                            builder: (dCtx) => const Center(child: CircularProgressIndicator()),
+                          );
+
+                          final success = await _updateMyNickname(newNick);
+
+                          // 关闭 overlay（对话框通常是挂载在根 Navigator 上）
+                          if (Navigator.of(context, rootNavigator: true).canPop()) {
+                            Navigator.of(context, rootNavigator: true).pop();
+                          }
+
+                          if (success) {
+                            // 保存成功后关闭编辑页（关闭 bottom sheet）
+                            if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+                          }
+                        },
                         child: const Text('保存'),
                       ),
                     ),
@@ -630,10 +899,6 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
           );
         },
       );
-
-      if (result != null && result.isNotEmpty) {
-        await _updateMyNickname(result);
-      }
       return;
     }
 
@@ -929,7 +1194,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      _getRoleText(member.role),
+                      Family.getRoleDescription(member.role),
                       style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     ),
                   ),

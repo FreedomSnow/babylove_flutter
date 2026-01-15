@@ -37,6 +37,24 @@ class AppUtils {
     }
   }
 
+  /// 将中文性别文本（例如 '男', '女'）转换为后端/模型使用的整数表示
+  /// 返回：1 表示男，2 表示女，解析失败返回 null
+  static int getGenderIntFromText(String? text) {
+    if (text == null) return 0;
+    switch (text.trim()) {
+        case '男':
+        case 'male':
+        case 'm':
+          return 1;
+        case '女':
+        case 'female':
+        case 'f':
+          return 2;
+        default:
+          return 0;
+    }
+  }
+
   /// 根据出生年份计算生肖
   ///
   /// 参数：
@@ -111,6 +129,31 @@ class AppUtils {
   /// 返回：格式化后的日期字符串，例如：2024年1月15日
   static String formatDateChinese(DateTime date) {
     return '${date.year}年${date.month}月${date.day}日';
+  }
+
+  /// 将 DateTime 转为 YYYY-MM-DD 格式的字符串
+  static String toYMD(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  /// 将 YYYY-MM-DD 格式的字符串转换为 DateTime（本地时区，若解析失败返回 null）
+  static DateTime? fromYMD(String? ymd) {
+    if (ymd == null) return null;
+    final s = ymd.trim();
+    if (s.isEmpty) return null;
+    try {
+      final parts = s.split('-');
+      if (parts.length < 3) return null;
+      final y = int.parse(parts[0]);
+      final m = int.parse(parts[1]);
+      final d = int.parse(parts[2]);
+      return DateTime(y, m, d);
+    } catch (e) {
+      return null;
+    }
   }
 
   /// 构建被照顾者完整信息字符串

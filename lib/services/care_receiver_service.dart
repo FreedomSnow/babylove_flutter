@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:babylove_flutter/core/network/network.dart';
 import 'package:babylove_flutter/models/care_receiver_model.dart';
+import 'package:babylove_flutter/core/utils.dart';
 import 'package:babylove_flutter/models/switch_care_receiver_response_model.dart';
 import 'package:babylove_flutter/models/create_family_care_receiver_response_model.dart';
 
@@ -26,37 +29,15 @@ class CareReceiverService {
   /// 返回：创建的被照顾者信息
   Future<ApiResponseWithStringCode<CareReceiver>> createCareReceiver({
     required String familyId,
-    required String name,
-    String? gender,
-    int? birthDate,
-    String? avatar,
-    String? residence,
-    String? phone,
-    EmergencyContact? emergencyContact,
-    String? medicalHistory,
-    String? allergies,
-    String? remark,
-    List<CustomField>? customFields,
+    required CareReceiver careReceiver,
   }) async {
     try {
-      final request = {
-        'name': name,
-        if (gender != null) 'gender': gender,
-        if (birthDate != null) 'birth_date': birthDate,
-        if (avatar != null) 'avatar': avatar,
-        if (residence != null) 'residence': residence,
-        if (phone != null) 'phone': phone,
-        if (emergencyContact != null) 'emergency_contact': emergencyContact.toJson(),
-        if (medicalHistory != null) 'medical_history': medicalHistory,
-        if (allergies != null) 'allergies': allergies,
-        if (remark != null) 'remark': remark,
-        if (customFields != null)
-          'custom_fields': customFields.map((field) => field.toJson()).toList(),
-      };
+      // 使用私有方法构建请求 map
+      final careReceiverJson = _careReceiverToRequestMap(careReceiver);
 
       final response = await _httpClient.postWithStringCode<CareReceiver>(
         '/api/families/$familyId/care-receivers',
-        data: request,
+        data: careReceiverJson,
         fromJson: (json) => CareReceiver.fromJson(json as Map<String, dynamic>),
       );
 
@@ -132,7 +113,7 @@ class CareReceiverService {
     try {
       final response = await _httpClient.putWithStringCode<CareReceiver>(
         '/api/families/$familyId/care-receivers/$careReceiverId',
-        data: careReceiver.toJson(),
+        data: jsonDecode(careReceiverToJsonString(careReceiver)),
         fromJson: (json) => CareReceiver.fromJson(json as Map<String, dynamic>),
       );
 
@@ -189,28 +170,7 @@ class CareReceiverService {
   }) async {
     try {
       // 构建请求数据，包含家庭信息和被照顾者信息
-      final careReceiverJson = careReceiver.toJson();
-
-      // 移除 id，后端创建时不需要客户端提供
-      careReceiverJson.remove('id');
-
-      // 将 gender 字段从字符串映射为后端需要的 int（约定：male=1, female=2）
-      if (careReceiver.gender != null) {
-        careReceiverJson['gender'] = _mapGenderToInt(careReceiver.gender);
-      }
-
-      // birth_date 由 YYYY-MM-DD 转为 UTC 毫秒时间戳
-      final birthDateStr = careReceiver.birthDate;
-      if (birthDateStr != null && birthDateStr.isNotEmpty) {
-        try {
-          final parsed = DateTime.parse(birthDateStr).toUtc();
-          careReceiverJson['birth_date'] = parsed.millisecondsSinceEpoch;
-        } catch (_) {
-          careReceiverJson.remove('birth_date');
-        }
-      } else {
-        careReceiverJson.remove('birth_date');
-      }
+      final careReceiverJson = _careReceiverToRequestMap(careReceiver);
       
       final request = {
         'family_name': familyName,
@@ -233,14 +193,38 @@ class CareReceiverService {
     }
   }
 
-  int? _mapGenderToInt(String? gender) {
-    switch (gender) {
-      case 'male':
-        return 1;
-      case 'female':
-        return 2;
-      default:
-        return null;
+  /// 将 `CareReceiver` 转换为用于请求的 Map（用于合并到请求体）
+  Map<String, dynamic> _careReceiverToRequestMap(CareReceiver careReceiver) {
+    final careReceiverJson = careReceiver.toJson();
+    // 移除 id，后端创建时不需要客户端提供
+    careReceiverJson.remove('id');
+    // 将 gender 字段从字符串映射为后端需要的 int（约定：male=1, female=2）
+    if (careReceiver.gender != null) {
+      careReceiverJson['gender'] = AppUtils.getGenderIntFromText(careReceiver.gender);
     }
+
+    // birth_date 由 YYYY-MM-DD 转为 UTC 毫秒时间戳
+    final birthDateStr = careReceiver.birthDate;
+    if (birthDateStr != null && birthDateStr.isNotEmpty) {
+      try {
+        final parsed = AppUtils.fromYMD(birthDateStr);
+        if (parsed != null) {
+          careReceiverJson['birth_date'] = parsed.toUtc().millisecondsSinceEpoch;
+        } else {
+          careReceiverJson.remove('birth_date');
+        }
+      } catch (_) {
+        careReceiverJson.remove('birth_date');
+      }
+    } else {
+      careReceiverJson.remove('birth_date');
+    }
+
+    return careReceiverJson;
+  }
+
+  /// 将 `CareReceiver` 转换为请求用的 JSON 字符串
+  String careReceiverToJsonString(CareReceiver careReceiver) {
+    return jsonEncode(_careReceiverToRequestMap(careReceiver));
   }
 }

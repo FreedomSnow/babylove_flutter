@@ -108,27 +108,28 @@ class AuthService {
   /// - [refreshToken] 刷新令牌
   ///
   /// 返回：新的登录响应数据（包含新的 token）
-  Future<ApiResponseWithStringCode<LoginResponseData>> refreshToken({
+  Future<ApiResponseWithStringCode<RefreshTokenResponseData>> refreshToken({
     required String refreshToken,
   }) async {
     try {
       final request = {'refresh_token': refreshToken};
 
-      final response = await _httpClient.postWithStringCode<LoginResponseData>(
+      final response = await _httpClient.postWithStringCode<RefreshTokenResponseData>(
         '/api/auth/refresh',
         data: request,
-        fromJson: (json) =>
-            LoginResponseData.fromJson(json as Map<String, dynamic>),
+        fromJson: (json) => RefreshTokenResponseData.fromJson(json as Map<String, dynamic>),
       );
 
       // 如果刷新成功，更新并保存新的 token
       if (response.isSuccess && response.data != null) {
         final data = response.data!;
         final accessToken = data.accessToken.isNotEmpty ? data.accessToken : data.token;
-        final refreshToken = data.refreshToken;
+        final newRefreshToken = data.refreshToken;
         _httpClient.setToken(accessToken);
         await _storageService.saveAccessToken(accessToken);
-        await _storageService.saveRefreshToken(refreshToken);
+        if (newRefreshToken.isNotEmpty) {
+          await _storageService.saveRefreshToken(newRefreshToken);
+        }
       }
 
       return response;
@@ -176,6 +177,26 @@ class AuthService {
       return response;
     } catch (e) {
       // 重新抛出异常
+      rethrow;
+    }
+  }
+
+  /// 获取当前用户信息（me）
+  ///
+  /// GET /api/auth/me
+  /// 返回结构（示例）见接口文档，使用 `LoginResponseData` 解析 `data` 字段
+  Future<ApiResponseWithStringCode<LoginResponseData>> getMe() async {
+    try {
+      final response = await _httpClient.getWithStringCode<LoginResponseData>(
+        '/api/auth/me',
+        fromJson: (json) => LoginResponseData.fromJson(json as Map<String, dynamic>),
+      );
+
+      debugPrint('getMe response: $response');
+
+      return response;
+    } catch (e) {
+      debugPrint('getMe error: $e');
       rethrow;
     }
   }

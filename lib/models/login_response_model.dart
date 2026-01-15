@@ -64,6 +64,43 @@ class LoginResponseData {
   }
 }
 
+/// 刷新 Token 接口响应数据
+class RefreshTokenResponseData {
+  final String accessToken;
+  final String refreshToken;
+  final String tokenType;
+  final int expiresIn;
+  final String token;
+
+  RefreshTokenResponseData({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.tokenType,
+    required this.expiresIn,
+    required this.token,
+  });
+
+  factory RefreshTokenResponseData.fromJson(Map<String, dynamic> json) {
+    return RefreshTokenResponseData(
+      accessToken: json['access_token'] as String? ?? json['token'] as String? ?? '',
+      refreshToken: json['refresh_token'] as String? ?? '',
+      tokenType: json['token_type'] as String? ?? '',
+      expiresIn: json['expires_in'] is int ? json['expires_in'] as int : int.tryParse('${json['expires_in']}') ?? 0,
+      token: json['token'] as String? ?? json['access_token'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'access_token': accessToken,
+      'refresh_token': refreshToken,
+      'token_type': tokenType,
+      'expires_in': expiresIn,
+      'token': token,
+    };
+  }
+}
+
 /// 登录请求参数
 class LoginRequest {
   final String phone;

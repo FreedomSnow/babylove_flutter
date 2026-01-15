@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:babylove_flutter/core/image_utils.dart';
 import 'package:babylove_flutter/core/network/network_exception.dart';
 import 'package:babylove_flutter/models/care_receiver_model.dart';
+import 'package:babylove_flutter/core/utils.dart';
 import 'package:babylove_flutter/pages/data_loading_page.dart';
 import 'package:babylove_flutter/services/app_state_service.dart';
 import 'package:babylove_flutter/services/care_receiver_service.dart';
@@ -173,9 +174,7 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
         id: '',
         name: careNickname,
         gender: _careGender,
-        birthDate: '${_careBirthDate!.year.toString().padLeft(4, '0')}-'
-            '${_careBirthDate!.month.toString().padLeft(2, '0')}-'
-            '${_careBirthDate!.day.toString().padLeft(2, '0')}',
+        birthDate: AppUtils.toYMD(_careBirthDate!),
         avatar: _careAvatarUrl,
       );
       debugPrint('Creating family with care receiver: $cr');
@@ -398,9 +397,9 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(
-                    _careBirthDate == null
-                        ? '选择出生年月日'
-                        : '${_careBirthDate!.year}-${_careBirthDate!.month.toString().padLeft(2, '0')}-${_careBirthDate!.day.toString().padLeft(2, '0')}',
+                  _careBirthDate == null
+                    ? '选择出生年月日'
+                    : AppUtils.toYMD(_careBirthDate!),
                     style: TextStyle(
                       fontSize: 16,
                       color: _careBirthDate == null
