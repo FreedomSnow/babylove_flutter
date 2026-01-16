@@ -3,13 +3,18 @@ import 'package:flutter/cupertino.dart';
 import 'package:babylove_flutter/core/image_utils.dart';
 import 'package:babylove_flutter/core/network/network_exception.dart';
 import 'package:babylove_flutter/models/care_receiver_model.dart';
+import 'package:babylove_flutter/core/utils.dart';
+import 'package:babylove_flutter/models/family_model.dart';
 import 'package:babylove_flutter/pages/data_loading_page.dart';
 import 'package:babylove_flutter/services/app_state_service.dart';
 import 'package:babylove_flutter/services/care_receiver_service.dart';
 import 'package:babylove_flutter/widgets/asset_image_picker.dart';
 
 class CreateFamilyPage extends StatefulWidget {
-  const CreateFamilyPage({super.key});
+  const CreateFamilyPage({super.key, this.goToDataLoading = false});
+
+  /// 创建成功后是否跳转到 DataLoadingPage（默认为 false，直接返回）
+  final bool goToDataLoading;
 
   @override
   State<CreateFamilyPage> createState() => _CreateFamilyPageState();
@@ -50,6 +55,15 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
     final messenger = ScaffoldMessenger.maybeOf(context);
     messenger?.showSnackBar(
       SnackBar(content: Text(message), backgroundColor: color, duration: const Duration(seconds: 2)),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    AppUtils.showErrorDialog(
+      context,
+      title: '错误',
+      message: message,
+      okText: '确定',
     );
   }
 
@@ -173,9 +187,7 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
         id: '',
         name: careNickname,
         gender: _careGender,
-        birthDate: '${_careBirthDate!.year.toString().padLeft(4, '0')}-'
-            '${_careBirthDate!.month.toString().padLeft(2, '0')}-'
-            '${_careBirthDate!.day.toString().padLeft(2, '0')}',
+        birthDate: AppUtils.formatUtcOrIsoToYMD(_careBirthDate!),
         avatar: _careAvatarUrl,
       );
       debugPrint('Creating family with care receiver: $cr');
@@ -189,21 +201,39 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
       );
 
       if (resp.isSuccess && resp.data != null) {
-        AppStateService().setLastFamily(resp.data!.family);
-        AppStateService().setLastCareReceiver(resp.data!.careReceiver);
         if (!mounted) return;
-        _showSnackBar('创建家庭成功', Theme.of(context).colorScheme.primary);
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const DataLoadingPage()),
-          (route) => false,
+
+        AppUtils.showInfoToast(
+          context,
+          message: '创建家庭成功',
+          type: ToastType.success,
         );
+
+        if (widget.goToDataLoading) {
+          AppStateService().setLastFamily(resp.data!.family);
+          AppStateService().setLastCareReceiver(resp.data!.careReceiver);
+
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const DataLoadingPage()),
+            (route) => false,
+          );
+        } else {
+          resp.data!.family.careReceivers = [resp.data!.careReceiver];
+          final families = List<Family>.from(AppStateService().myFamilies)..add(resp.data!.family);
+          AppStateService().setMyFamilies(families);
+          
+          Navigator.of(context).pop(true);
+        }
       } else {
-        _showSnackBar('创建失败: ${resp.message}', Theme.of(context).colorScheme.error);
+        final msg = '创建家庭失败: ${resp.message ?? '未知错误'}';
+        _showErrorDialog(msg);
       }
     } on NetworkException catch (e) {
-      _showSnackBar('创建失败: ${e.message}', Theme.of(context).colorScheme.error);
+      final msg = '创建失败: ${e.message}';
+      _showErrorDialog(msg);
     } catch (e) {
-      _showSnackBar('创建失败: $e', Theme.of(context).colorScheme.error);
+      final msg = '创建家庭失败: $e';
+      _showErrorDialog(msg);
     } finally {
       if (mounted) {
         setState(() {
@@ -398,9 +428,9 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(
-                    _careBirthDate == null
-                        ? '选择出生年月日'
-                        : '${_careBirthDate!.year}-${_careBirthDate!.month.toString().padLeft(2, '0')}-${_careBirthDate!.day.toString().padLeft(2, '0')}',
+                  _careBirthDate == null
+                    ? '选择出生年月日'
+                    : AppUtils.formatUtcOrIsoToYMD(_careBirthDate!),
                     style: TextStyle(
                       fontSize: 16,
                       color: _careBirthDate == null

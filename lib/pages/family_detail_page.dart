@@ -1,5 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/image_utils.dart';
+import '../core/utils.dart';
 import '../widgets/asset_image_picker.dart';
 import '../models/care_receiver_model.dart';
 import '../models/family_model.dart';
@@ -31,7 +34,6 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
 
   // 当前用户在该家庭中的成员对象（若存在）
   FamilyMember? _myMember;
-  String? _editedMyNickname;
 
   @override
   void initState() {
@@ -45,10 +47,11 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
     if (currentUserId != null) {
       try {
         _myMember = widget.family.members.firstWhere((m) => m.userId == currentUserId);
-        _editedMyNickname = _myMember?.nickname;
       } catch (_) {
         _myMember = null;
       }
+
+      debugPrint('Current user member in family: $_myMember');
     }
   }
 
@@ -82,24 +85,26 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
       } else {
         // 处理错误
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response.message ?? '加载数据失败'),
-            backgroundColor: Colors.red,
-          ),
+        final msg = response.message ?? '加载数据失败';
+        AppUtils.showInfoToast(
+          context,
+          message: msg,
+          type: ToastType.error,
         );
+        _showErrorDialog(msg);
         setState(() {
           _isLoading = false;
         });
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('加载数据失败: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+      final msg = '加载数据失败: ${e.toString()}';
+      AppUtils.showInfoToast(
+        context,
+        message: msg,
+        type: ToastType.error,
       );
+      _showErrorDialog(msg);
       setState(() {
         _isLoading = false;
       });
@@ -140,57 +145,114 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
 
     if (confirm != true) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    // 显示半透明全屏加载遮罩
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
 
     try {
       final resp = await _familyService.leaveFamily(familyId: widget.family.id);
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      if (!mounted) return;
+
       if (resp.isSuccess) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已退出家庭')));
+        // 从 AppStateService 中移除该家庭并重置最近家庭
+        final families = List<Family>.from(_appState.myFamilies)
+          ..removeWhere((f) => f.id == widget.family.id);
+        _appState.setMyFamilies(families);
+        if (_appState.lastFamily?.id == widget.family.id) {
+          _appState.setLastFamily(families.isNotEmpty ? families.first : null);
+        }
+
+        AppUtils.showInfoToast(
+          context,
+          message: '已退出家庭',
+          type: ToastType.success,
+        );
         Navigator.of(context).pop();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '退出失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '退出失败';
+        AppUtils.showInfoToast(
+          context,
+          message: msg,
+          type: ToastType.error,
+        );
+        _showErrorDialog(msg);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('退出失败: ${e.toString()}'), backgroundColor: Colors.red));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      final msg = '退出失败: ${e.toString()}';
+      AppUtils.showInfoToast(
+        context,
+        message: msg,
+        type: ToastType.error,
+      );
+      _showErrorDialog(msg);
     }
   }
 
   Future<void> _onDestroyFamily() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('销毁家庭'),
-        content: const Text('销毁家庭将删除所有数据，且无法恢复，确认继续吗？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('销毁', style: TextStyle(color: Colors.red))),
-        ],
-      ),
+    AppUtils.showInfoToast(
+      context,
+      message: '销毁家庭功能正在开发中，敬请期待！',
+      type: ToastType.warning,
     );
 
-    if (confirm != true) return;
+    // final confirm = await showDialog<bool>(
+    //   context: context,
+    //   builder: (ctx) => AlertDialog(
+    //     title: const Text('销毁家庭'),
+    //     content: const Text('销毁家庭将删除所有数据，且无法恢复，确认继续吗？'),
+    //     actions: [
+    //       TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
+    //       TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('销毁', style: TextStyle(color: Colors.red))),
+    //     ],
+    //   ),
+    // );
 
-    setState(() {
-      _isLoading = true;
-    });
+    // if (confirm != true) return;
 
-    try {
-      final resp = await _familyService.deleteFamily(familyId: widget.family.id);
-      if (resp.isSuccess) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('家庭已销毁')));
-        Navigator.of(context).pop();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '销毁失败'), backgroundColor: Colors.red));
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('销毁失败: ${e.toString()}'), backgroundColor: Colors.red));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    // setState(() {
+    //   _isLoading = true;
+    // });
+
+    // try {
+    //   final resp = await _familyService.deleteFamily(familyId: widget.family.id);
+    //   if (resp.isSuccess) {
+    //     AppUtils.showInfoToast(
+    //       context,
+    //       message: '家庭已销毁',
+    //       type: ToastType.success,
+    //     );
+    //     Navigator.of(context).pop();
+    //   } else {
+    //     final msg = resp.message ?? '销毁失败';
+    //     AppUtils.showInfoToast(
+    //       context,
+    //       message: msg,
+    //       type: ToastType.error,
+    //     );
+    //     _showErrorDialog(msg);
+    //   }
+    // } catch (e) {
+    //   final msg = '销毁失败: ${e.toString()}';
+    //   AppUtils.showInfoToast(
+    //     context,
+    //     message: msg,
+    //     type: ToastType.error,
+    //   );
+    //   _showErrorDialog(msg);
+    // } finally {
+    //   if (mounted) setState(() => _isLoading = false);
+    // }
   }
 
   Future<void> _changeMemberRole(FamilyMember member) async {
@@ -236,12 +298,28 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
           );
         }
         _updateAppState();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('成员角色已修改')));
+        AppUtils.showInfoToast(
+          context,
+          message: '成员角色已修改',
+          type: ToastType.success,
+        );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '修改失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '修改失败';
+        AppUtils.showInfoToast(
+          context,
+          message: msg,
+          type: ToastType.error,
+        );
+        _showErrorDialog(msg);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('修改失败: ${e.toString()}'), backgroundColor: Colors.red));
+      final msg = '修改失败: ${e.toString()}';
+      AppUtils.showInfoToast(
+        context,
+        message: msg,
+        type: ToastType.error,
+      );
+      _showErrorDialog(msg);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -249,8 +327,10 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
 
   Future<void> _removeMember(FamilyMember member) async {
     if (member.userId == _appState.currentUser?.id) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('不能删除自己')),
+      AppUtils.showInfoToast(
+        context,
+        message: '不能删除自己',
+        type: ToastType.warning,
       );
       return;
     }
@@ -278,12 +358,28 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
       if (resp.isSuccess) {
         widget.family.members.removeWhere((m) => m.id == member.id);
         _updateAppState();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('成员已移除')));
+        AppUtils.showInfoToast(
+          context,
+          message: '成员已移除',
+          type: ToastType.success,
+        );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '移除失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '移除失败';
+        AppUtils.showInfoToast(
+          context,
+          message: msg,
+          type: ToastType.error,
+        );
+        _showErrorDialog(msg);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('移除失败: ${e.toString()}'), backgroundColor: Colors.red));
+      final msg = '移除失败: ${e.toString()}';
+      AppUtils.showInfoToast(
+        context,
+        message: msg,
+        type: ToastType.error,
+      );
+      _showErrorDialog(msg);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -304,27 +400,390 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
     );
   }
 
-  String _getRoleText(String role) {
-    switch (role) {
-      case 'owner':
-        return '创建者';
-      case 'admin':
-        return '管理员';
-      case 'member':
-        return '成员';
-      default:
-        return '未知';
+
+  Future<void> _addCareReceiver() async {
+    final nameController = TextEditingController();
+    String? tempAvatar;
+    String? selectedGender;
+    DateTime? selectedBirthDate;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: StatefulBuilder(
+            builder: (ctx, setModalState) {
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('添加被照顾者', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          InkWell(
+                            onTap: () async {
+                              final resource = await showAssetImagePicker(
+                                context,
+                                subdir: 'dependent',
+                                title: '选择头像',
+                                initialSelectedResource: tempAvatar,
+                              );
+                              if (resource != null) setModalState(() => tempAvatar = resource);
+                            },
+                            child: CircleAvatar(
+                              radius: 32,
+                              backgroundImage: AppImageUtils.imageProviderFor(
+                                tempAvatar,
+                                defaultResource: 'resource:///dependent/default.png',
+                              ),
+                              child: AppImageUtils.imageProviderFor(
+                                        tempAvatar,
+                                        defaultResource: 'resource:///dependent/default.png',
+                                      ) ==
+                                      null
+                                  ? const Icon(Icons.person, size: 32)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: nameController,
+                              decoration: const InputDecoration(labelText: '昵称'),
+                              autofocus: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 性别选择
+                      Row(
+                        children: [
+                          const Text('性别：', style: TextStyle(fontSize: 14)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: RadioListTile<String?>(
+                                    title: const Text('男'),
+                                    value: '男',
+                                    groupValue: selectedGender,
+                                    onChanged: (v) => setModalState(() => selectedGender = v),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: RadioListTile<String?>(
+                                    title: const Text('女'),
+                                    value: '女',
+                                    groupValue: selectedGender,
+                                    onChanged: (v) => setModalState(() => selectedGender = v),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // 出生日期选择
+                      Row(
+                        children: [
+                          const Text('出生：', style: TextStyle(fontSize: 14)),
+                          const SizedBox(width: 12),
+                          TextButton(
+                            onPressed: () async {
+                              final now = DateTime.now();
+                              var tempDate = selectedBirthDate ?? now;
+
+                              await showModalBottomSheet<void>(
+                                context: ctx,
+                                builder: (bCtx) {
+                                  return SafeArea(
+                                    child: SizedBox(
+                                      height: 300,
+                                      child: Column(
+                                        children: [
+                                          Expanded(
+                                            child: CupertinoDatePicker(
+                                              mode: CupertinoDatePickerMode.date,
+                                              initialDateTime: tempDate,
+                                              maximumDate: now,
+                                              onDateTimeChanged: (val) {
+                                                tempDate = val;
+                                              },
+                                            ),
+                                          ),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                            children: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(bCtx).pop(),
+                                                child: const Text('取消'),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  setModalState(() => selectedBirthDate = tempDate);
+                                                  Navigator.of(bCtx).pop();
+                                                },
+                                                child: const Text('确定'),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                            child: Text(selectedBirthDate == null ? '未设置' : AppUtils.formatUtcOrIsoToYMD(selectedBirthDate!)),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final newName = nameController.text.trim();
+                            if (newName.isEmpty) {
+                              AppUtils.showInfoToast(
+                                ctx,
+                                message: '昵称不能为空',
+                                type: ToastType.error,
+                              );
+                              return;
+                            }
+
+                            // 显示全屏半透明 overlay
+                            showDialog(
+                              context: ctx,
+                              barrierDismissible: false,
+                              barrierColor: Colors.black.withOpacity(0.4),
+                              builder: (dCtx) => const Center(child: CircularProgressIndicator()),
+                            );
+
+                            final newCareReceiver = CareReceiver(
+                              id: '', // 由后端生成
+                              name: newName,
+                              gender: selectedGender,
+                              birthDate: selectedBirthDate == null ? null : AppUtils.formatUtcOrIsoToYMD(selectedBirthDate!),
+                              avatar: tempAvatar,
+                            );
+
+                            final success = await _createCareReceiver(newCareReceiver);
+
+                            // 关闭 overlay（对话框通常是挂载在根 Navigator 上）
+                            if (Navigator.of(context, rootNavigator: true).canPop()) {
+                              Navigator.of(context, rootNavigator: true).pop();
+                            }
+
+                            if (success) {
+                              // 保存成功后关闭编辑页（关闭 bottom sheet）
+                              if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+                            }
+                          },
+                          child: const Text('保存'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  /// 创建被照顾者，返回是否成功（不自动关闭编辑页）
+  Future<bool> _createCareReceiver(CareReceiver careReceiver) async {
+    try {
+      final resp = await _careReceiverService.createCareReceiver(
+        familyId: widget.family.id,
+        careReceiver: careReceiver,
+      );
+
+      if (resp.isSuccess) {
+        if (mounted) {
+          setState(() {
+            widget.family.careReceivers.add(resp.data!);
+          });
+        }
+        _updateAppState();
+
+        // 同步更新 AppStateService 中缓存的家庭数据（lastFamily 与 myFamilies）
+        final appState = AppStateService();
+        final createdCare = resp.data!;
+
+        // 更新 lastFamily 中的被照顾者列表
+        final lastFamily = appState.lastFamily;
+        if (lastFamily != null && lastFamily.id == widget.family.id) {
+          lastFamily.careReceivers = List.from(lastFamily.careReceivers)..add(createdCare);
+          appState.setLastFamily(lastFamily);
+        }
+
+        // 更新 myFamilies 列表中的对应家庭
+        final families = appState.myFamilies;
+        final fIdx = families.indexWhere((f) => f.id == widget.family.id);
+        if (fIdx >= 0) {
+          final foundFamily = families[fIdx];
+          final idx = foundFamily.careReceivers.indexWhere((f) => f.id == createdCare.id);
+          if (idx < 0) {
+            foundFamily.careReceivers = List.from(foundFamily.careReceivers)..add(createdCare);
+            families[fIdx] = foundFamily;
+            appState.setMyFamilies(families);
+          }
+        }
+
+        AppUtils.showInfoToast(
+          context,
+          message: '被照顾者已创建',
+          type: ToastType.success,
+        );
+        return true;
+      } else {
+        final msg = resp.message ?? '创建失败';
+        AppUtils.showInfoToast(
+          context,
+          message: msg,
+          type: ToastType.error,
+        );
+        _showErrorDialog(msg);
+        return false;
+      }
+    } catch (e) {
+      if (!mounted) return false;
+      final msg = '创建被照顾者失败: ${e.toString()}';
+      AppUtils.showInfoToast(
+        context,
+        message: msg,
+        type: ToastType.error,
+      );
+      _showErrorDialog(msg);
+      return false;
     }
   }
 
-  void _addCareReceiver() {
-    ScaffoldMessenger.of(
+  void _showErrorDialog(String message) {
+    // 统一使用通用工具方法显示错误弹窗
+    AppUtils.showErrorDialog(
       context,
-    ).showSnackBar(const SnackBar(content: Text('添加被照顾者功能开发中')));
+      title: '错误',
+      message: message,
+      okText: '确定',
+    );
   }
 
-  void _showErrorMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
+  Future<void> _onInviteMember() async {
+    if (!_isPrimary) {
+      AppUtils.showInfoToast(
+        context,
+        message: '仅家庭创建者可邀请成员',
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    // 显示全屏透明加载遮罩，允许看到下层内容
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.4),
+      builder: (dCtx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final resp = await _familyService.generateInviteCode(familyId: widget.family.id);
+
+      if (!mounted) {
+        if (Navigator.of(context, rootNavigator: true).canPop()) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+        return;
+      }
+
+      if (!resp.isSuccess || resp.data == null || resp.data!.isEmpty) {
+        final msg = resp.message ?? '生成邀请码失败';
+        if (Navigator.of(context, rootNavigator: true).canPop()) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+        _showErrorDialog(msg);
+        return;
+      }
+
+      final code = resp.data!;
+
+      // 关闭加载遮罩
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) {
+          return AlertDialog(
+            title: const Text('邀请成员'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('将邀请码分享给成员加入家庭'),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SelectableText(
+                        code,
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy_outlined),
+                      tooltip: '复制邀请码',
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: code));
+                        if (!mounted) return;
+                        AppUtils.showInfoToast(
+                          context,
+                          message: '邀请码已复制',
+                          type: ToastType.success,
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('确定'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      final msg = '生成邀请码失败: ${e.toString()}';
+      _showErrorDialog(msg);
+    }
   }
 
   Future<void> _handleFamilyInfoTap() async {
@@ -334,8 +793,8 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
 
     final nameController = TextEditingController(text: _displayFamilyName);
     String? tempAvatar = _displayFamilyAvatar;
-
-    final result = await showModalBottomSheet<Map<String, String?>>(
+    
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
@@ -395,11 +854,43 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(ctx).pop({
-                              'name': nameController.text.trim(),
-                              'avatar': tempAvatar,
-                            });
+                          onPressed: () async {
+                            final newName = nameController.text.trim();
+                            final newAvatar = tempAvatar;
+                            if (newName.isEmpty) {
+                              AppUtils.showInfoToast(
+                                ctx,
+                                message: '家庭名称不能为空',
+                                type: ToastType.error,
+                              );
+                              return;
+                            }
+
+                            // 若名称与头像均未变化，则直接关闭编辑页
+                            if (newName == _displayFamilyName && (newAvatar ?? '') == (_displayFamilyAvatar ?? '')) {
+                              Navigator.of(ctx).pop();
+                              return;
+                            }
+
+                            // 显示全屏半透明 overlay
+                            showDialog(
+                              context: ctx,
+                              barrierDismissible: false,
+                              barrierColor: Colors.black.withOpacity(0.4),
+                              builder: (dCtx) => const Center(child: CircularProgressIndicator()),
+                            );
+
+                            final success = await _updateFamilyInfo(newName, newAvatar);
+
+                            // 关闭 overlay（对话框通常是挂载在根 Navigator 上）
+                            if (Navigator.of(context, rootNavigator: true).canPop()) {
+                              Navigator.of(context, rootNavigator: true).pop();
+                            }
+
+                            if (success) {
+                              // 保存成功后关闭编辑页（关闭 bottom sheet）
+                              if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+                            }
                           },
                           child: const Text('保存'),
                         ),
@@ -413,31 +904,13 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
         );
       },
     );
-
-    if (result == null) return;
-
-    final newName = result['name']?.trim() ?? '';
-    final newAvatar = result['avatar'];
-    if (newName.isEmpty) {
-      _showErrorMessage('家庭名称不能为空');
-      return;
-    }
-
-    // 若名称与头像均未变化，则不调用更新，仅关闭编辑页
-    if (newName == _displayFamilyName && (newAvatar ?? '') == (_displayFamilyAvatar ?? '')) {
-      return;
-    }
-
-    await _updateFamilyInfo(newName, newAvatar);
   }
 
-  Future<void> _updateFamilyInfo(String newName, String? newAvatar) async {
-    // 若内容未变，直接返回（调用方的编辑页已关闭）
+  /// 更新家庭信息，返回是否成功（不自动关闭编辑页）
+  Future<bool> _updateFamilyInfo(String newName, String? newAvatar) async {
     if (newName == _displayFamilyName && (newAvatar ?? '') == (_displayFamilyAvatar ?? '')) {
-      return;
+      return true;
     }
-
-    setState(() => _isLoading = true);
 
     try {
       final resp = await _familyService.updateFamily(
@@ -447,33 +920,80 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
       );
 
       if (resp.isSuccess) {
+        if (!mounted) return true;
         setState(() {
           _displayFamilyName = resp.data?.name ?? newName;
           _displayFamilyAvatar = resp.data?.avatar ?? newAvatar;
-          _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('家庭信息已保存')));
+
+        // 更新 AppStateService 中对应的 family 信息（若存在于缓存中）
+        final appState = AppStateService();
+        final updatedFamily = resp.data;
+        if (updatedFamily != null) {
+          // 更新 lastFamily
+          if (appState.lastFamily?.id == updatedFamily.id) {
+            updatedFamily.lastCareReceiver = appState.lastFamily?.lastCareReceiver;
+            updatedFamily.careReceivers = appState.lastFamily?.careReceivers ?? [];
+            updatedFamily.members = appState.lastFamily?.members ?? [];
+            appState.setLastFamily(updatedFamily);
+          }
+
+          // 更新 myFamilies 列表中的该家庭
+          final families = appState.myFamilies;
+          final idx = families.indexWhere((f) => f.id == updatedFamily.id);
+          if (idx >= 0) {
+            final foundFamily = families[idx];
+            updatedFamily.lastCareReceiver = foundFamily.lastCareReceiver;
+            updatedFamily.careReceivers = foundFamily.careReceivers;
+            updatedFamily.members = foundFamily.members;
+            families[idx] = updatedFamily;
+            appState.setMyFamilies(families);
+          }
+        }
+        AppUtils.showInfoToast(
+          context,
+          message: '家庭信息已保存',
+          type: ToastType.success,
+        );
+        return true;
       } else {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '保存失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '保存失败';
+        AppUtils.showInfoToast(
+          context,
+          message: msg,
+          type: ToastType.error,
+        );
+        _showErrorDialog(msg);
+        return false;
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败: ${e.toString()}'), backgroundColor: Colors.red),
+      if (!mounted) return false;
+      final msg = '保存失败: ${e.toString()}';
+      AppUtils.showInfoToast(
+        context,
+        message: msg,
+        type: ToastType.error,
       );
+      _showErrorDialog(msg);
+      return false;
     }
   }
 
-  Future<void> _updateMyNickname(String newNickname) async {
-    if (_myMember == null) return;
+  /// 更新当前用户昵称，返回是否成功（不自动关闭编辑页）
+  Future<bool> _updateMyNickname(String newNickname) async {
+    debugPrint('Attempting to update my nickname to: $_myMember');
+    if (_myMember == null) return false;
     if (newNickname.trim().isEmpty) {
-      _showErrorMessage('昵称不能为空');
-      return;
+      AppUtils.showInfoToast(
+        context,
+        message: '昵称不能为空',
+        type: ToastType.error,
+      );
+      return false;
     }
 
-    setState(() => _isLoading = true);
+    debugPrint('Updating my nickname to: $newNickname');
+
     try {
       final resp = await _familyService.updateMyNickname(
         familyId: widget.family.id,
@@ -481,122 +1001,371 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
       );
       if (resp.isSuccess) {
         final updated = resp.data!;
-        final idx = widget.family.members.indexWhere((m) => m.id == updated.id);
-        if (idx >= 0) {
-          widget.family.members[idx] = updated;
+        // 更新页面显示以及本地缓存
+        if (mounted) {
+          setState(() {
+            final idx = widget.family.members.indexWhere((m) => m.id == updated.id);
+            if (idx >= 0) {
+              widget.family.members[idx] = updated;
+            }
+            _myMember = updated;
+          });
         }
-        _myMember = updated;
-        _editedMyNickname = updated.nickname;
+
+        // 如果当前登录用户与该 member 对应，则同步更新 AppStateService 中的 currentUser
+        if (_appState.currentUser != null && _appState.currentUser!.id == updated.userId) {
+          final newUser = _appState.currentUser!.copyWith(nickname: updated.nickname);
+          _appState.setCurrentUser(newUser);
+        }
+
+        // 更新 app 全局里的家庭成员缓存
         _updateAppState();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('我的昵称已保存')));
+
+        AppUtils.showInfoToast(
+          context,
+          message: '我的昵称已保存',
+          type: ToastType.success,
+        );
+        return true;
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '保存失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '保存失败';
+        AppUtils.showInfoToast(
+          context,
+          message: msg,
+          type: ToastType.error,
+        );
+        _showErrorDialog(msg);
+        return false;
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败: ${e.toString()}'), backgroundColor: Colors.red),
+      if (!mounted) return false;
+      final msg = '保存失败: ${e.toString()}';
+      AppUtils.showInfoToast(
+        context,
+        message: msg,
+        type: ToastType.error,
       );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      _showErrorDialog(msg);
+      return false;
     }
   }
 
   Future<void> _handleCareReceiverTap(CareReceiver careReceiver) async {
     if (!_isPrimary) {
-      _showErrorMessage('仅家庭主负责人可编辑被照顾者');
+      AppUtils.showInfoToast(
+        context,
+        message: '仅家庭管理员可编辑被照顾者',
+        type: ToastType.error,
+      );
       return;
     }
 
-    final controller = TextEditingController(text: careReceiver.name);
-    final result = await showModalBottomSheet<String>(
+    final nameController = TextEditingController(text: careReceiver.name);
+    String? tempAvatar = careReceiver.avatar;
+    String? selectedGender = careReceiver.gender;
+    DateTime? selectedBirthDate = AppUtils.dateTimeFromYMD(careReceiver.birthDate);
+
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
         return Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('编辑被照顾者', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(labelText: '昵称'),
+          child: StatefulBuilder(
+            builder: (ctx, setModalState) {
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('编辑被照顾者', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          InkWell(
+                            onTap: () async {
+                              final resource = await showAssetImagePicker(
+                                context,
+                                subdir: 'dependent',
+                                title: '选择头像',
+                                initialSelectedResource: tempAvatar,
+                              );
+                              if (resource != null) setModalState(() => tempAvatar = resource);
+                            },
+                            child: CircleAvatar(
+                              radius: 32,
+                              backgroundImage: AppImageUtils.imageProviderFor(
+                                tempAvatar,
+                                defaultResource: 'resource:///dependent/default.png',
+                              ),
+                              child: AppImageUtils.imageProviderFor(
+                                        tempAvatar,
+                                        defaultResource: 'resource:///dependent/default.png',
+                                      ) ==
+                                      null
+                                  ? const Icon(Icons.person, size: 32)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: nameController,
+                              decoration: const InputDecoration(labelText: '昵称'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 性别选择
+                      Row(
+                        children: [
+                          const Text('性别：', style: TextStyle(fontSize: 14)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: RadioListTile<String?>(
+                                    title: const Text('男'),
+                                    value: '男',
+                                    groupValue: selectedGender,
+                                    onChanged: (v) => setModalState(() => selectedGender = v),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: RadioListTile<String?>(
+                                    title: const Text('女'),
+                                    value: '女',
+                                    groupValue: selectedGender,
+                                    onChanged: (v) => setModalState(() => selectedGender = v),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // 出生日期选择
+                      Row(
+                        children: [
+                          const Text('出生：', style: TextStyle(fontSize: 14)),
+                          const SizedBox(width: 12),
+                          TextButton(
+                            onPressed: () async {
+                              final now = DateTime.now();
+                              var tempDate = selectedBirthDate ?? now;
+
+                              await showModalBottomSheet<void>(
+                                context: ctx,
+                                builder: (bCtx) {
+                                  return SafeArea(
+                                    child: SizedBox(
+                                      height: 300,
+                                      child: Column(
+                                        children: [
+                                          Expanded(
+                                            child: CupertinoDatePicker(
+                                              mode: CupertinoDatePickerMode.date,
+                                              initialDateTime: tempDate,
+                                              maximumDate: now,
+                                              onDateTimeChanged: (val) {
+                                                tempDate = val;
+                                              },
+                                            ),
+                                          ),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                            children: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(bCtx).pop(),
+                                                child: const Text('取消'),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  setModalState(() => selectedBirthDate = tempDate);
+                                                  Navigator.of(bCtx).pop();
+                                                },
+                                                child: const Text('确定'),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                            child: Text(selectedBirthDate == null ? '未设置' : AppUtils.formatUtcOrIsoToYMD(selectedBirthDate!)),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final newName = nameController.text.trim();
+                            if (newName.isEmpty) {
+                              AppUtils.showInfoToast(
+                                ctx,
+                                message: '昵称不能为空',
+                                type: ToastType.error,
+                              );
+                              return;
+                            }
+
+                            // 若全部字段未变化则关闭
+                            final unchanged = newName == careReceiver.name &&
+                                (tempAvatar ?? '') == (careReceiver.avatar ?? '') &&
+                                (selectedGender ?? '') == (careReceiver.gender ?? '') &&
+                                (selectedBirthDate == AppUtils.dateTimeFromYMD(careReceiver.birthDate));
+                            if (unchanged) {
+                              Navigator.of(ctx).pop();
+                              return;
+                            }
+
+                            // 显示全屏半透明 overlay
+                            showDialog(
+                              context: ctx,
+                              barrierDismissible: false,
+                              barrierColor: Colors.black.withOpacity(0.4),
+                              builder: (dCtx) => const Center(child: CircularProgressIndicator()),
+                            );
+
+                            final updated = CareReceiver(
+                              id: careReceiver.id,
+                              name: newName,
+                              gender: selectedGender,
+                              birthDate: selectedBirthDate == null ? null : AppUtils.formatUtcOrIsoToYMD(selectedBirthDate!),
+                              avatar: tempAvatar,
+                              residence: careReceiver.residence,
+                              phone: careReceiver.phone,
+                              emergencyContact: careReceiver.emergencyContact,
+                              medicalHistory: careReceiver.medicalHistory,
+                              allergies: careReceiver.allergies,
+                              remark: careReceiver.remark,
+                              customFields: careReceiver.customFields,
+                            );
+
+                            final success = await _updateCareReceiver(careReceiver, updated);
+
+                            // 关闭 overlay（对话框通常是挂载在根 Navigator 上）
+                            if (Navigator.of(context, rootNavigator: true).canPop()) {
+                              Navigator.of(context, rootNavigator: true).pop();
+                            }
+
+                            if (success) {
+                              // 保存成功后关闭编辑页（关闭 bottom sheet）
+                              if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+                            }
+                          },
+                          child: const Text('保存'),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-                      child: const Text('保存'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         );
       },
     );
-
-    if (result == null || result.isEmpty) return;
-    await _updateCareReceiver(careReceiver, result);
   }
 
-  Future<void> _updateCareReceiver(CareReceiver careReceiver, String newName) async {
-    setState(() => _isLoading = true);
+  /// 更新被照顾者，返回是否成功（不自动关闭编辑页）
+  Future<bool> _updateCareReceiver(CareReceiver original, CareReceiver updated) async {
     try {
-      final updated = CareReceiver(
-        id: careReceiver.id,
-        name: newName,
-        gender: careReceiver.gender,
-        birthDate: careReceiver.birthDate,
-        avatar: careReceiver.avatar,
-        residence: careReceiver.residence,
-        phone: careReceiver.phone,
-        emergencyContact: careReceiver.emergencyContact,
-        medicalHistory: careReceiver.medicalHistory,
-        allergies: careReceiver.allergies,
-        remark: careReceiver.remark,
-        customFields: careReceiver.customFields,
-      );
-
       final resp = await _careReceiverService.updateCareReceiver(
         familyId: widget.family.id,
-        careReceiverId: careReceiver.id,
+        careReceiverId: original.id,
         careReceiver: updated,
       );
 
       if (resp.isSuccess) {
-        final idx = widget.family.careReceivers.indexWhere((c) => c.id == careReceiver.id);
-        if (idx >= 0) {
-          widget.family.careReceivers[idx] = resp.data!;
+        if (mounted) {
+          setState(() {
+            final idx = widget.family.careReceivers.indexWhere((c) => c.id == original.id);
+            if (idx >= 0) {
+              widget.family.careReceivers[idx] = resp.data!;
+            }
+          });
         }
-        _updateAppState();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('被照顾者信息已保存')));
+
+        // 同步更新 AppStateService 中缓存的家庭数据（lastFamily 与 myFamilies）
+        final appState = AppStateService();
+        final updatedCare = resp.data!;
+
+        // 更新 lastFamily 中的被照顾者列表
+        final lastFamily = appState.lastFamily;
+        if (lastFamily != null && lastFamily.id == widget.family.id) {
+          if (lastFamily.lastCareReceiver?.id == updatedCare.id) {
+            lastFamily.lastCareReceiver = updatedCare;
+          }
+
+          final cIdx = lastFamily.careReceivers.indexWhere((c) => c.id == updatedCare.id);
+          if (cIdx >= 0) {
+            lastFamily.careReceivers[cIdx] = updatedCare;
+          }
+        }
+
+        // 更新 myFamilies 列表中的对应家庭
+        final families = appState.myFamilies;
+        final fIdx = families.indexWhere((f) => f.id == widget.family.id);
+        if (fIdx >= 0) {
+          final found = families[fIdx];
+          final ccIdx = found.careReceivers.indexWhere((c) => c.id == updatedCare.id);
+          if (ccIdx >= 0) {
+            found.careReceivers[ccIdx] = updatedCare;
+            families[fIdx] = found;
+            appState.setMyFamilies(families);
+          }
+        }
+
+        AppUtils.showInfoToast(
+          context,
+          message: '被照顾者信息已保存',
+          type: ToastType.success,
+        );
+        return true;
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp.message ?? '保存失败'), backgroundColor: Colors.red));
+        final msg = resp.message ?? '保存失败';
+        AppUtils.showInfoToast(
+          context,
+          message: msg,
+          type: ToastType.error,
+        );
+        _showErrorDialog(msg);
+        return false;
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败: ${e.toString()}'), backgroundColor: Colors.red),
+      if (!mounted) return false;
+      final msg = '保存失败: ${e.toString()}';
+      AppUtils.showInfoToast(
+        context,
+        message: msg,
+        type: ToastType.error,
       );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      _showErrorDialog(msg);
+      return false;
     }
   }
 
   Future<void> _handleMemberTap(FamilyMember member) async {
     final isMe = member.userId == _appState.currentUser?.id;
+    print('Tapped on member: ${member.nickname}, isMe: $isMe');
     if (isMe) {
       final controller = TextEditingController(text: member.nickname);
-      final result = await showModalBottomSheet<String>(
+      await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         builder: (ctx) {
@@ -619,7 +1388,46 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+                        onPressed: () async {
+                          final newNick = controller.text.trim();
+                          debugPrint('Attempting to save new nickname: $newNick');
+                          if (newNick.isEmpty) {
+                            AppUtils.showInfoToast(
+                              ctx,
+                              message: '昵称不能为空',
+                              type: ToastType.error,
+                            );
+                            return;
+                          }
+
+                          debugPrint('New nickname: $newNick, current nickname: ${member.nickname}');
+
+                          if (newNick == member.nickname) {
+                            Navigator.of(ctx).pop();
+                            return;
+                          }
+
+                          showDialog(
+                            context: ctx,
+                            barrierDismissible: false,
+                            barrierColor: Colors.black.withOpacity(0.4),
+                            builder: (dCtx) => const Center(child: CircularProgressIndicator()),
+                          );
+
+                          debugPrint('Saving new nickname...');
+
+                          final success = await _updateMyNickname(newNick);
+
+                          // 关闭 overlay（对话框通常是挂载在根 Navigator 上）
+                          if (Navigator.of(context, rootNavigator: true).canPop()) {
+                            Navigator.of(context, rootNavigator: true).pop();
+                          }
+
+                          if (success) {
+                            // 保存成功后关闭编辑页（关闭 bottom sheet）
+                            if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+                          }
+                        },
                         child: const Text('保存'),
                       ),
                     ),
@@ -630,15 +1438,15 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
           );
         },
       );
-
-      if (result != null && result.isNotEmpty) {
-        await _updateMyNickname(result);
-      }
       return;
     }
 
     if (!_isPrimary) {
-      _showErrorMessage('仅家庭主负责人可管理其他成员');
+      AppUtils.showInfoToast(
+        context,
+        message: '仅家庭管理员可管理其他成员',
+        type: ToastType.error,
+      );
       return;
     }
 
@@ -700,7 +1508,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
             onSelected: (v) {
               if (v == 'leave') _onLeaveFamily();
               if (v == 'destroy') _onDestroyFamily();
-              if (v == 'invite') ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('邀请成员功能开发中')));
+              if (v == 'invite') _onInviteMember();
             },
             itemBuilder: (ctx) {
               final items = <PopupMenuEntry<String>>[];
@@ -774,13 +1582,13 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                 '被照顾者',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              TextButton.icon(
-                icon: const Icon(Icons.add),
-                label: const Text('添加'),
-                onPressed: _isPrimary ? _addCareReceiver : () {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('仅家庭主负责人可添加被照顾者')));
-                },
-              ),
+              _isPrimary
+                  ? TextButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text('添加'),
+                      onPressed: _addCareReceiver,
+                    )
+                  : const SizedBox.shrink(),
             ],
           ),
 
@@ -806,47 +1614,79 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
               ),
             )
           else
-            ...widget.family.careReceivers.map((careReceiver) {
-              final canEditCareReceiver = _isPrimary;
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(12),
-                  leading: CircleAvatar(
-                    radius: 28,
-                    backgroundImage: AppImageUtils.imageProviderFor(
-                      careReceiver.avatar,
-                      defaultResource: 'resource:///dependent/default.png',
+            ...(() {
+              final orderedCareReceivers = List<CareReceiver>.from(widget.family.careReceivers);
+              final last = widget.family.lastCareReceiver;
+              if (last != null) {
+                final idx = orderedCareReceivers.indexWhere((c) => c.id == last.id);
+                if (idx > 0) {
+                  final item = orderedCareReceivers.removeAt(idx);
+                  orderedCareReceivers.insert(0, item);
+                }
+              }
+
+              return orderedCareReceivers.map((careReceiver) {
+                final canEditCareReceiver = _isPrimary;
+                final isSelected = widget.family.lastCareReceiver?.id == careReceiver.id;
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(12),
+                    leading: CircleAvatar(
+                      radius: 28,
+                      backgroundImage: AppImageUtils.imageProviderFor(
+                        careReceiver.avatar,
+                        defaultResource: 'resource:///dependent/default.png',
+                      ),
+                      child: AppImageUtils.imageProviderFor(
+                                careReceiver.avatar,
+                                defaultResource: 'resource:///dependent/default.png',
+                              ) ==
+                              null
+                          ? const Icon(Icons.person, size: 28)
+                          : null,
                     ),
-                    child: AppImageUtils.imageProviderFor(
-                              careReceiver.avatar,
-                              defaultResource: 'resource:///dependent/default.png',
-                            ) ==
-                            null
-                        ? const Icon(Icons.person, size: 28)
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            careReceiver.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (isSelected)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              '选中',
+                              style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                      ],
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        careReceiver.buildCareReceiverInfo(),
+                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      ),
+                    ),
+                    trailing: canEditCareReceiver ? const Icon(Icons.chevron_right) : null,
+                    onTap: canEditCareReceiver
+                        ? () => _handleCareReceiverTap(careReceiver)
                         : null,
                   ),
-                  title: Text(
-                    careReceiver.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      careReceiver.buildCareReceiverInfo(),
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                    ),
-                  ),
-                  trailing: canEditCareReceiver ? const Icon(Icons.chevron_right) : null,
-                  onTap: canEditCareReceiver
-                      ? () => _handleCareReceiverTap(careReceiver)
-                      : null,
-                ),
-              );
-            }),
+                );
+              });
+            }()),
 
           const SizedBox(height: 24),
 
@@ -929,7 +1769,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      _getRoleText(member.role),
+                      Family.getRoleDescription(member.role),
                       style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     ),
                   ),

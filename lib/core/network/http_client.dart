@@ -1,6 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:dio_smart_retry/dio_smart_retry.dart';
+import 'package:flutter/material.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
+import '../../core/global.dart';
+import '../../services/app_state_service.dart';
+import '../../services/storage_service.dart';
 import 'network_config.dart';
 import 'network_exception.dart';
 import 'response_model.dart';
@@ -15,6 +19,9 @@ class HttpClient {
 
   late Dio _dio;
   final AuthInterceptor _authInterceptor = AuthInterceptor();
+  final StorageService _storageService = StorageService();
+  bool _isRefreshing = false;
+  bool _isShowingAuthDialog = false;
 
   HttpClient._internal() {
     _dio = Dio(
@@ -288,19 +295,21 @@ class HttpClient {
     Options? options,
     CancelToken? cancelToken,
     T Function(dynamic json)? fromJson,
+    bool enableAuthRetry = true,
   }) async {
-    try {
-      final response = await _dio.post(
-        path,
-        data: data,
-        queryParameters: queryParameters,
-        options: options,
-        cancelToken: cancelToken,
-      );
-      return _handleResponseWithStringCode<T>(response, fromJson);
-    } on DioException catch (e) {
-      throw _handleError(e);
-    }
+    return _executeWithAuthRetry<T>(
+      enableAuthRetry,
+      () async {
+        final response = await _dio.post(
+          path,
+          data: data,
+          queryParameters: queryParameters,
+          options: options,
+          cancelToken: cancelToken,
+        );
+        return _handleResponseWithStringCode<T>(response, fromJson);
+      },
+    );
   }
 
   /// GET 请求（支持字符串类型的 code）
@@ -310,18 +319,20 @@ class HttpClient {
     Options? options,
     CancelToken? cancelToken,
     T Function(dynamic json)? fromJson,
+    bool enableAuthRetry = true,
   }) async {
-    try {
-      final response = await _dio.get(
-        path,
-        queryParameters: queryParameters,
-        options: options,
-        cancelToken: cancelToken,
-      );
-      return _handleResponseWithStringCode<T>(response, fromJson);
-    } on DioException catch (e) {
-      throw _handleError(e);
-    }
+    return _executeWithAuthRetry<T>(
+      enableAuthRetry,
+      () async {
+        final response = await _dio.get(
+          path,
+          queryParameters: queryParameters,
+          options: options,
+          cancelToken: cancelToken,
+        );
+        return _handleResponseWithStringCode<T>(response, fromJson);
+      },
+    );
   }
 
   /// PUT 请求（支持字符串类型的 code）
@@ -332,19 +343,21 @@ class HttpClient {
     Options? options,
     CancelToken? cancelToken,
     T Function(dynamic json)? fromJson,
+    bool enableAuthRetry = true,
   }) async {
-    try {
-      final response = await _dio.put(
-        path,
-        data: data,
-        queryParameters: queryParameters,
-        options: options,
-        cancelToken: cancelToken,
-      );
-      return _handleResponseWithStringCode<T>(response, fromJson);
-    } on DioException catch (e) {
-      throw _handleError(e);
-    }
+    return _executeWithAuthRetry<T>(
+      enableAuthRetry,
+      () async {
+        final response = await _dio.put(
+          path,
+          data: data,
+          queryParameters: queryParameters,
+          options: options,
+          cancelToken: cancelToken,
+        );
+        return _handleResponseWithStringCode<T>(response, fromJson);
+      },
+    );
   }
 
   /// DELETE 请求（支持字符串类型的 code）
@@ -355,19 +368,21 @@ class HttpClient {
     Options? options,
     CancelToken? cancelToken,
     T Function(dynamic json)? fromJson,
+    bool enableAuthRetry = true,
   }) async {
-    try {
-      final response = await _dio.delete(
-        path,
-        data: data,
-        queryParameters: queryParameters,
-        options: options,
-        cancelToken: cancelToken,
-      );
-      return _handleResponseWithStringCode<T>(response, fromJson);
-    } on DioException catch (e) {
-      throw _handleError(e);
-    }
+    return _executeWithAuthRetry<T>(
+      enableAuthRetry,
+      () async {
+        final response = await _dio.delete(
+          path,
+          data: data,
+          queryParameters: queryParameters,
+          options: options,
+          cancelToken: cancelToken,
+        );
+        return _handleResponseWithStringCode<T>(response, fromJson);
+      },
+    );
   }
 
   /// 处理字符串 code 的响应
@@ -388,5 +403,125 @@ class HttpClient {
         data: fromJson != null ? fromJson(response.data) : response.data as T?,
       );
     }
+  }
+
+  /// 针对字符串 code 的请求增加 HTTP_401 自动刷新与重登录处理
+  Future<ApiResponseWithStringCode<T>> _executeWithAuthRetry<T>(
+    bool enableAuthRetry,
+    Future<ApiResponseWithStringCode<T>> Function() request,
+  ) async {
+    if (!enableAuthRetry) {
+      try {
+        return await request();
+      } on DioException catch (e) {
+        throw _handleError(e);
+      }
+    }
+
+    try {
+      var response = await request();
+      if (response.code != 'HTTP_401') return response;
+
+      final refreshed = await _tryRefreshToken();
+      if (refreshed) {
+        response = await request();
+        if (response.code != 'HTTP_401') return response;
+      }
+
+      await _handleAuthExpired();
+      return response;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// 尝试刷新 Token，成功则返回 true
+  Future<bool> _tryRefreshToken() async {
+    if (_isRefreshing) return false;
+    _isRefreshing = true;
+    try {
+      final refreshToken = await _storageService.getRefreshToken();
+      if (refreshToken == null || refreshToken.isEmpty) return false;
+
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: NetworkConfig.baseUrl,
+          connectTimeout: Duration(milliseconds: NetworkConfig.connectTimeout),
+          receiveTimeout: Duration(milliseconds: NetworkConfig.receiveTimeout),
+          sendTimeout: Duration(milliseconds: NetworkConfig.sendTimeout),
+          headers: NetworkConfig.headers,
+        ),
+      );
+
+      final resp = await dio.post(
+        '/api/auth/refresh',
+        data: {'refresh_token': refreshToken},
+      );
+
+      if (resp.data is! Map<String, dynamic>) return false;
+      final map = resp.data as Map<String, dynamic>;
+      final code = map['code']?.toString() ?? '';
+      if (code != 'NO_ERROR') return false;
+
+      final data = map['data'];
+      if (data is! Map<String, dynamic>) return false;
+
+      final accessToken = data['access_token']?.toString() ?? data['token']?.toString() ?? '';
+      final newRefreshToken = data['refresh_token']?.toString() ?? '';
+      if (accessToken.isEmpty) return false;
+
+      _authInterceptor.setToken(accessToken);
+      await _storageService.saveAccessToken(accessToken);
+      if (newRefreshToken.isNotEmpty) {
+        await _storageService.saveRefreshToken(newRefreshToken);
+      }
+
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  /// 处理刷新失败或二次 401：提示并跳转登录
+  Future<void> _handleAuthExpired() async {
+    if (_isShowingAuthDialog) return;
+    _isShowingAuthDialog = true;
+
+    final ctx = navigatorKey.currentState?.overlay?.context;
+    if (ctx == null) {
+      _isShowingAuthDialog = false;
+      return;
+    }
+
+    await showDialog<void>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('登录已过期'),
+          content: const Text('请重新登录后继续使用'),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _forceLogoutAndGoLogin();
+              },
+              child: const Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
+
+    _isShowingAuthDialog = false;
+  }
+
+  Future<void> _forceLogoutAndGoLogin() async {
+    await _storageService.clearTokens();
+    AppStateService().clear();
+
+    navigatorKey.currentState?.pushNamedAndRemoveUntil('/', (route) => false);
   }
 }

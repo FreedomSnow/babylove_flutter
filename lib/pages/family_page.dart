@@ -8,6 +8,7 @@ import '../services/app_state_service.dart';
 import '../providers/app_state_provider.dart';
 import '../widgets/family_selector.dart';
 import '../widgets/join_family_dialog.dart';
+import 'create_family_page.dart';
 import 'family_detail_page.dart';
 
 /// 家庭页面
@@ -60,14 +61,6 @@ class _FamilyPageState extends State<FamilyPage> {
                 members: data.members,
               );
 
-              // 校验并修正最近的被照顾者，如果之前的被照顾者不在新列表中则回退到首个（若有）
-              // final currentCr = _appState.lastCareReceiver;
-              // if (currentCr == null ||
-              //     !data.careReceivers.any((cr) => cr.id == currentCr.id)) {
-              //   final newCr = data.careReceivers.isNotEmpty ? data.careReceivers.first : null;
-              //   _appState.setLastCareReceiver(newCr);
-              // }
-
               // 更新本地缓存显示
               setState(() {
                 _families = _appState.myFamilies;
@@ -119,21 +112,25 @@ class _FamilyPageState extends State<FamilyPage> {
         ),
         toolbarHeight: 68,
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: TextButton.icon(
-              onPressed: () async {
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'create') {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CreateFamilyPage()),
+                );
+                _loadFamiliesFromState();
+              } else if (value == 'join') {
                 final joined = await showJoinFamilyDialog(context);
                 if (joined) {
                   _loadFamiliesFromState();
                 }
-              },
-              icon: const Icon(Icons.group_add, color: Colors.white),
-              label: const Text('加入家庭', style: TextStyle(color: Colors.white)),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-              ),
-            ),
+              }
+            },
+            itemBuilder: (ctx) => const [
+              PopupMenuItem(value: 'create', child: Text('创建家庭')),
+              PopupMenuItem(value: 'join', child: Text('加入家庭')),
+            ],
           ),
         ],
       ),

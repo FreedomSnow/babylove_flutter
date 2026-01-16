@@ -6,6 +6,7 @@ import 'package:babylove_flutter/providers/theme_provider.dart';
 import 'package:babylove_flutter/providers/elder_mode_provider.dart';
 import 'package:babylove_flutter/providers/app_state_provider.dart';
 import 'package:babylove_flutter/pages/splash_page.dart';
+import 'package:babylove_flutter/core/global.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +36,7 @@ class MyApp extends StatelessWidget {
           return MaterialApp(
             title: '宝贝爱',
             debugShowCheckedModeBanner: false,
+            navigatorKey: navigatorKey,
             theme: themeProvider.getThemeData(elderModeProvider.isElderMode),
             home: const SplashPage(),
             locale: const Locale('zh', 'CN'),

@@ -4,6 +4,7 @@ import 'package:babylove_flutter/services/auth_service.dart';
 import 'package:babylove_flutter/services/storage_service.dart';
 import 'package:babylove_flutter/services/app_state_service.dart';
 import 'package:babylove_flutter/core/network/network_exception.dart';
+import 'package:babylove_flutter/core/utils.dart';
 import 'legal_document_page.dart';
 import 'welcome_page.dart';
 import 'data_loading_page.dart';
@@ -95,7 +96,6 @@ class _LoginPageState extends State<LoginPage>
           setState(() {
             _receivedCode = response.data!.code;
           });
-          // _showSnackBar('验证码已发送: ${response.data!.code}', Colors.green);
           // 自动聚焦验证码输入框,弹出键盘
           _codeFocusNode.requestFocus();
         } else {
@@ -104,10 +104,7 @@ class _LoginPageState extends State<LoginPage>
           _codeFocusNode.requestFocus();
         }
       } else {
-        _showSnackBar(
-          '发送失败: ${response.message}',
-          Theme.of(context).colorScheme.error,
-        );
+        _showErrorDialog('验证码发送失败: ${response.message ?? '未知错误'}');
         // 发送失败时重置倒计时
         _timer?.cancel();
         setState(() {
@@ -115,7 +112,8 @@ class _LoginPageState extends State<LoginPage>
         });
       }
     } catch (e) {
-      _showSnackBar('发送失败: $e', Theme.of(context).colorScheme.error);
+      final msg = '验证码发送失败: $e';
+      _showErrorDialog(msg);
       // 发送失败时重置倒计时
       _timer?.cancel();
       setState(() {
@@ -166,7 +164,7 @@ class _LoginPageState extends State<LoginPage>
 
         // 保存用户数据到全局状态
         final appState = AppStateService();
-        appState.updateLoginData(
+        appState.updateMeData(
           user: response.data!.user,
           lastFamily: response.data!.lastFamily,
           lastCareReceiver: response.data!.lastCareReceiver,
@@ -187,15 +185,14 @@ class _LoginPageState extends State<LoginPage>
           }
         }
       } else {
-        _showSnackBar(
-          '登录失败: ${response.message}',
-          Theme.of(context).colorScheme.error,
-        );
+        _showErrorDialog('登录失败: ${response.message ?? '未知错误'}');
       }
     } on NetworkException catch (e) {
-      _showSnackBar('登录失败: ${e.message}', Theme.of(context).colorScheme.error);
+      final msg = '登录失败: ${e.message}';
+      _showErrorDialog(msg);
     } catch (e) {
-      _showSnackBar('登录失败: $e', Theme.of(context).colorScheme.error);
+      final msg = '登录失败: $e';
+      _showErrorDialog(msg);
     } finally {
       if (mounted) {
         setState(() {
@@ -216,6 +213,15 @@ class _LoginPageState extends State<LoginPage>
         ),
       );
     }
+  }
+
+  void _showErrorDialog(String message) {
+    AppUtils.showErrorDialog(
+      context,
+      title: '错误',
+      message: message,
+      okText: '确定',
+    );
   }
 
   @override

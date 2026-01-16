@@ -85,6 +85,28 @@ class Family {
   static const String ROLE_CAREGIVER = 'caregiver';
   static const String ROLE_VISITOR = 'visitor';
 
+  /// 根据角色返回中文描述
+  /// - 'primary_caregiver' -> '管理员'
+  /// - 'assistant_caregiver' -> '监管者'
+  /// - 'caregiver' -> '执行者'
+  /// - 'visitor' -> '访客'（默认）
+  static String getRoleDescription(String? role) {
+    switch (role) {
+      case ROLE_PRIMARY_CAREGIVER:
+        return '管理员';
+      case ROLE_ASSISTANT_CAREGIVER:
+        return '监管者';
+      case ROLE_CAREGIVER:
+        return '执行者';
+      case ROLE_VISITOR:
+      default:
+        return '访客';
+    }
+  }
+
+  /// 实例快捷 getter，返回当前 `role` 的中文描述
+  String get roleDescription => Family.getRoleDescription(role);
+
   bool get isPrimaryCaregiver => role == ROLE_PRIMARY_CAREGIVER;
   bool get isAssistantCaregiver => role == ROLE_ASSISTANT_CAREGIVER;
   bool get isCaregiver => role == ROLE_CAREGIVER;

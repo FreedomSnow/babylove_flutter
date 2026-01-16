@@ -1,3 +1,5 @@
+import 'package:flutter/rendering.dart';
+
 import '../core/utils.dart';
 
 /// 紧急联系人模型
@@ -100,15 +102,8 @@ class CareReceiver {
 
   /// 从 JSON 创建实例
   factory CareReceiver.fromJson(Map<String, dynamic> json) {
-    // 解析 birth_date：从 UTC 毫秒时间转换为 YYYY-MM-DD 格式
-    String? birthDateStr;
-    final birthDateMs = json['birth_date'] as int?;
-    if (birthDateMs != null) {
-      final dateTime = DateTime.fromMillisecondsSinceEpoch(birthDateMs);
-      birthDateStr = '${dateTime.year.toString().padLeft(4, '0')}-'
-          '${dateTime.month.toString().padLeft(2, '0')}-'
-          '${dateTime.day.toString().padLeft(2, '0')}';
-    }
+    // 解析 birth_date：支持 UTC 毫秒或 ISO8601/日期字符串
+    final String? birthDateStr = AppUtils.formatUtcOrIsoToYMD(json['birth_date']);
 
     final String? avatarRaw = json['avatar'] as String?;
     final String avatarValue = (avatarRaw != null && avatarRaw.trim().isNotEmpty)
@@ -118,7 +113,12 @@ class CareReceiver {
     return CareReceiver(
       id: json['id']?.toString() ?? '',
       name: json['name'] as String? ?? '',
-      gender: AppUtils.getGenderTextFromInt(json['gender'] as int?),
+      gender: AppUtils.getGenderTextFromInt(() {
+        final g = json['gender'];
+        if (g is int) return g;
+        if (g is String) return int.tryParse(g);
+        return null;
+      }()),
       birthDate: birthDateStr,
       avatar: avatarValue,
       residence: json['residence'] as String?,
@@ -141,35 +141,13 @@ class CareReceiver {
     );
   }
 
-  /// 将 birthDate (YYYY-MM-DD 格式的字符串) 转换为 DateTime
-  DateTime? get birthDateAsDateTime {
-    if (birthDate == null) return null;
-    try {
-      return DateTime.parse(birthDate!);
-    } catch (e) {
-      return null;
-    }
-  }
-
   /// 转换为 JSON
   Map<String, dynamic> toJson() {
-    // 将 birthDate (YYYY-MM-DD 格式) 转换回 UTC 毫秒时间
-    int birthDateMs = 0;
-    if (birthDate != null) {
-      try {
-        final dateTime = DateTime.parse(birthDate!);
-        birthDateMs = dateTime.millisecondsSinceEpoch;
-      } catch (e) {
-        // 解析失败则保持为 null
-        birthDateMs = 0;
-      }
-    }
-
     return {
       'id': id,
       'name': name,
-      if (gender != null) 'gender': gender,
-      'birth_date': birthDateMs,
+      'gender': AppUtils.getGenderIntFromText(gender),
+      'birth_date': AppUtils.ymdToUtcMillis(birthDate),
       if (avatar != null) 'avatar': avatar,
       if (residence != null) 'residence': residence,
       if (phone != null) 'phone': phone,
@@ -187,7 +165,7 @@ class CareReceiver {
   ///
   /// 返回：格式化的信息字符串，例如：1941年11月25日 · 蛇 · 84岁 · 女
   String buildCareReceiverInfo() {
-    final birthDateTime = birthDateAsDateTime;
+    final birthDateTime = AppUtils.dateTimeFromYMD(birthDate);
     if (birthDateTime == null) {
       return gender != null ? "未知出生日期 · ${gender!}" : '未知出生日期';
     }

@@ -16,7 +16,7 @@ class _WelcomePageState extends State<WelcomePage> {
   /// 跳转到创建家庭页面
   void _goToCreateFamilyPage() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CreateFamilyPage()),
+      MaterialPageRoute(builder: (_) => const CreateFamilyPage(goToDataLoading: true)),
     );
   }
 
@@ -37,6 +37,12 @@ class _WelcomePageState extends State<WelcomePage> {
     final appName = '幼安管家'; // 应用名称
 
     return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        toolbarHeight: 0,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
