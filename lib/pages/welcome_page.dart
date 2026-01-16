@@ -16,7 +16,7 @@ class _WelcomePageState extends State<WelcomePage> {
   /// 跳转到创建家庭页面
   void _goToCreateFamilyPage() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CreateFamilyPage()),
+      MaterialPageRoute(builder: (_) => const CreateFamilyPage(goToDataLoading: true)),
     );
   }
 

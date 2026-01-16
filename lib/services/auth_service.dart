@@ -1,5 +1,8 @@
 import 'package:babylove_flutter/core/network/network.dart';
+import 'package:babylove_flutter/models/care_receiver_model.dart';
+import 'package:babylove_flutter/models/family_model.dart';
 import 'package:babylove_flutter/models/login_response_model.dart';
+import 'package:babylove_flutter/models/user_model.dart';
 import 'package:babylove_flutter/services/storage_service.dart';
 import 'package:flutter/widgets.dart';
 
@@ -185,20 +188,55 @@ class AuthService {
   /// 获取当前用户信息（me）
   ///
   /// GET /api/auth/me
-  /// 返回结构（示例）见接口文档，使用 `LoginResponseData` 解析 `data` 字段
-  Future<ApiResponseWithStringCode<LoginResponseData>> getMe() async {
+  /// 返回结构：{ code, data: { user, last_family, last_care_receiver } }
+  Future<ApiResponseWithStringCode<MeResponseData>> getMe() async {
     try {
-      final response = await _httpClient.getWithStringCode<LoginResponseData>(
+      final response = await _httpClient.getWithStringCode<MeResponseData>(
         '/api/auth/me',
-        fromJson: (json) => LoginResponseData.fromJson(json as Map<String, dynamic>),
+        fromJson: (json) {
+          if (json is Map<String, dynamic>) {
+            final container = json['data'] is Map<String, dynamic>
+                ? (json['data'] as Map<String, dynamic>)
+                : json;
+            return MeResponseData.fromJson(container);
+          }
+          return MeResponseData.fromJson({});
+        },
       );
-
-      debugPrint('getMe response: $response');
 
       return response;
     } catch (e) {
       debugPrint('getMe error: $e');
       rethrow;
     }
+  }
+}
+
+/// me 接口响应数据
+class MeResponseData {
+  final User user;
+  final Family? lastFamily;
+  final CareReceiver? lastCareReceiver;
+
+  MeResponseData({required this.user, this.lastFamily, this.lastCareReceiver});
+
+  factory MeResponseData.fromJson(Map<String, dynamic> json) {
+    return MeResponseData(
+      user: User.fromJson(json['user'] as Map<String, dynamic>? ?? {}),
+      lastFamily: json['last_family'] is Map<String, dynamic>
+          ? Family.fromJson(json['last_family'] as Map<String, dynamic>)
+          : null,
+      lastCareReceiver: json['last_care_receiver'] is Map<String, dynamic>
+          ? CareReceiver.fromJson(json['last_care_receiver'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user': user.toJson(),
+      'last_family': lastFamily?.toJson(),
+      'last_care_receiver': lastCareReceiver?.toJson(),
+    };
   }
 }

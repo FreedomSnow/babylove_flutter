@@ -164,7 +164,7 @@ class _LoginPageState extends State<LoginPage>
 
         // 保存用户数据到全局状态
         final appState = AppStateService();
-        appState.updateLoginData(
+        appState.updateMeData(
           user: response.data!.user,
           lastFamily: response.data!.lastFamily,
           lastCareReceiver: response.data!.lastCareReceiver,

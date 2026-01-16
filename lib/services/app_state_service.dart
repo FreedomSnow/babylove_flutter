@@ -78,21 +78,17 @@ class AppStateService with ChangeNotifier {
   }
 
   /// 更新登录数据
-  void updateLoginData({
+  void updateMeData({
     User? user,
     Family? lastFamily,
     CareReceiver? lastCareReceiver,
   }) {
-    if (user != null) {
-      _currentUser = user;
+    _currentUser = user;
+    _lastFamily = lastFamily;
+    if (_lastFamily != null) {
+        _lastFamily!.lastCareReceiver = lastCareReceiver;
     }
-    if (lastFamily != null) {
-      _lastFamily = lastFamily;
-      debugPrint('Updated lastFamily to ${lastFamily.id}');
-      _lastFamily!.lastCareReceiver = lastCareReceiver;
-      debugPrint(
-          'Updated lastCareReceiver to ${lastCareReceiver?.id}');
-    }
+    debugPrint('AppStateService updated login data: user=$_currentUser, lastFamily=$_lastFamily, lastCareReceiver=$lastCareReceiver');
 
     notifyListeners();
   }

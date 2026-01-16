@@ -18,14 +18,15 @@ class InitialLoadService {
         return false;
       }
 
-      // 更新全局登录数据
-      final loginData = meResp.data!;
-      appState.updateLoginData(
-        user: loginData.user,
-        lastFamily: loginData.lastFamily,
-        lastCareReceiver: loginData.lastCareReceiver,
-      );
+      debugPrint('Me data: ${meResp.data}');
 
+      // 更新全局登录数据
+      final meData = meResp.data!;
+      appState.updateMeData(
+        user: meData.user,
+        lastFamily: meData.lastFamily,
+        lastCareReceiver: meData.lastCareReceiver,
+      );
 
       // 1. 获取我的家庭列表
       final familiesResp = await familyService.getMyFamilies();

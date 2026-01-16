@@ -4,13 +4,17 @@ import 'package:babylove_flutter/core/image_utils.dart';
 import 'package:babylove_flutter/core/network/network_exception.dart';
 import 'package:babylove_flutter/models/care_receiver_model.dart';
 import 'package:babylove_flutter/core/utils.dart';
+import 'package:babylove_flutter/models/family_model.dart';
 import 'package:babylove_flutter/pages/data_loading_page.dart';
 import 'package:babylove_flutter/services/app_state_service.dart';
 import 'package:babylove_flutter/services/care_receiver_service.dart';
 import 'package:babylove_flutter/widgets/asset_image_picker.dart';
 
 class CreateFamilyPage extends StatefulWidget {
-  const CreateFamilyPage({super.key});
+  const CreateFamilyPage({super.key, this.goToDataLoading = false});
+
+  /// 创建成功后是否跳转到 DataLoadingPage（默认为 false，直接返回）
+  final bool goToDataLoading;
 
   @override
   State<CreateFamilyPage> createState() => _CreateFamilyPageState();
@@ -197,14 +201,29 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
       );
 
       if (resp.isSuccess && resp.data != null) {
-        AppStateService().setLastFamily(resp.data!.family);
-        AppStateService().setLastCareReceiver(resp.data!.careReceiver);
         if (!mounted) return;
-        _showSnackBar('创建家庭成功', Theme.of(context).colorScheme.primary);
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const DataLoadingPage()),
-          (route) => false,
+
+        AppUtils.showInfoToast(
+          context,
+          message: '创建家庭成功',
+          type: ToastType.success,
         );
+
+        if (widget.goToDataLoading) {
+          AppStateService().setLastFamily(resp.data!.family);
+          AppStateService().setLastCareReceiver(resp.data!.careReceiver);
+
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const DataLoadingPage()),
+            (route) => false,
+          );
+        } else {
+          resp.data!.family.careReceivers = [resp.data!.careReceiver];
+          final families = List<Family>.from(AppStateService().myFamilies)..add(resp.data!.family);
+          AppStateService().setMyFamilies(families);
+          
+          Navigator.of(context).pop(true);
+        }
       } else {
         final msg = '创建家庭失败: ${resp.message ?? '未知错误'}';
         _showErrorDialog(msg);
