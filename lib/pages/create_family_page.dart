@@ -174,7 +174,7 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
         id: '',
         name: careNickname,
         gender: _careGender,
-        birthDate: AppUtils.toYMD(_careBirthDate!),
+        birthDate: AppUtils.formatUtcOrIsoToYMD(_careBirthDate!),
         avatar: _careAvatarUrl,
       );
       debugPrint('Creating family with care receiver: $cr');
@@ -399,7 +399,7 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
                   child: Text(
                   _careBirthDate == null
                     ? '选择出生年月日'
-                    : AppUtils.toYMD(_careBirthDate!),
+                    : AppUtils.formatUtcOrIsoToYMD(_careBirthDate!),
                     style: TextStyle(
                       fontSize: 16,
                       color: _careBirthDate == null

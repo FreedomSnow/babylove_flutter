@@ -28,7 +28,24 @@ class NetworkException implements Exception {
         break;
       case DioExceptionType.badResponse:
         code = error.response?.statusCode;
-        message = _handleStatusCode(code);
+        // 优先返回服务端的错误信息（包括字符串或 JSON message 字段），否则使用状态码提示
+        final data = error.response?.data;
+        String? serverMessage;
+        if (data is Map<String, dynamic>) {
+          serverMessage = data['message']?.toString() ?? data['msg']?.toString() ?? data['error']?.toString();
+        } else if (data is String) {
+          serverMessage = data.trim();
+        }
+
+        if (serverMessage != null && serverMessage.isNotEmpty) {
+          // 避免过长的 HTML 或文本占满 UI，截断到 200 字符
+          if (serverMessage.length > 200) {
+            serverMessage = serverMessage.substring(0, 200) + '...';
+          }
+          message = serverMessage;
+        } else {
+          message = _handleStatusCode(code);
+        }
         break;
       case DioExceptionType.cancel:
         message = '请求已取消';

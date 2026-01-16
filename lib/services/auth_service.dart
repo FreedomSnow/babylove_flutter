@@ -118,6 +118,7 @@ class AuthService {
         '/api/auth/refresh',
         data: request,
         fromJson: (json) => RefreshTokenResponseData.fromJson(json as Map<String, dynamic>),
+        enableAuthRetry: false,
       );
 
       // 如果刷新成功，更新并保存新的 token

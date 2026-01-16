@@ -198,27 +198,6 @@ class CareReceiverService {
     final careReceiverJson = careReceiver.toJson();
     // 移除 id，后端创建时不需要客户端提供
     careReceiverJson.remove('id');
-    // 将 gender 字段从字符串映射为后端需要的 int（约定：male=1, female=2）
-    if (careReceiver.gender != null) {
-      careReceiverJson['gender'] = AppUtils.getGenderIntFromText(careReceiver.gender);
-    }
-
-    // birth_date 由 YYYY-MM-DD 转为 UTC 毫秒时间戳
-    final birthDateStr = careReceiver.birthDate;
-    if (birthDateStr != null && birthDateStr.isNotEmpty) {
-      try {
-        final parsed = AppUtils.fromYMD(birthDateStr);
-        if (parsed != null) {
-          careReceiverJson['birth_date'] = parsed.toUtc().millisecondsSinceEpoch;
-        } else {
-          careReceiverJson.remove('birth_date');
-        }
-      } catch (_) {
-        careReceiverJson.remove('birth_date');
-      }
-    } else {
-      careReceiverJson.remove('birth_date');
-    }
 
     return careReceiverJson;
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../core/image_utils.dart';
 import '../core/utils.dart';
@@ -319,10 +320,264 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
   }
 
 
-  void _addCareReceiver() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('添加被照顾者功能开发中')));
+  Future<void> _addCareReceiver() async {
+    final nameController = TextEditingController();
+    String? tempAvatar;
+    String? selectedGender;
+    DateTime? selectedBirthDate;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: StatefulBuilder(
+            builder: (ctx, setModalState) {
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('添加被照顾者', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          InkWell(
+                            onTap: () async {
+                              final resource = await showAssetImagePicker(
+                                context,
+                                subdir: 'dependent',
+                                title: '选择头像',
+                                initialSelectedResource: tempAvatar,
+                              );
+                              if (resource != null) setModalState(() => tempAvatar = resource);
+                            },
+                            child: CircleAvatar(
+                              radius: 32,
+                              backgroundImage: AppImageUtils.imageProviderFor(
+                                tempAvatar,
+                                defaultResource: 'resource:///dependent/default.png',
+                              ),
+                              child: AppImageUtils.imageProviderFor(
+                                        tempAvatar,
+                                        defaultResource: 'resource:///dependent/default.png',
+                                      ) ==
+                                      null
+                                  ? const Icon(Icons.person, size: 32)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: nameController,
+                              decoration: const InputDecoration(labelText: '昵称'),
+                              autofocus: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 性别选择
+                      Row(
+                        children: [
+                          const Text('性别：', style: TextStyle(fontSize: 14)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: RadioListTile<String?>(
+                                    title: const Text('男'),
+                                    value: '男',
+                                    groupValue: selectedGender,
+                                    onChanged: (v) => setModalState(() => selectedGender = v),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: RadioListTile<String?>(
+                                    title: const Text('女'),
+                                    value: '女',
+                                    groupValue: selectedGender,
+                                    onChanged: (v) => setModalState(() => selectedGender = v),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // 出生日期选择
+                      Row(
+                        children: [
+                          const Text('出生：', style: TextStyle(fontSize: 14)),
+                          const SizedBox(width: 12),
+                          TextButton(
+                            onPressed: () async {
+                              final now = DateTime.now();
+                              var tempDate = selectedBirthDate ?? now;
+
+                              await showModalBottomSheet<void>(
+                                context: ctx,
+                                builder: (bCtx) {
+                                  return SafeArea(
+                                    child: SizedBox(
+                                      height: 300,
+                                      child: Column(
+                                        children: [
+                                          Expanded(
+                                            child: CupertinoDatePicker(
+                                              mode: CupertinoDatePickerMode.date,
+                                              initialDateTime: tempDate,
+                                              maximumDate: now,
+                                              onDateTimeChanged: (val) {
+                                                tempDate = val;
+                                              },
+                                            ),
+                                          ),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                            children: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(bCtx).pop(),
+                                                child: const Text('取消'),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  setModalState(() => selectedBirthDate = tempDate);
+                                                  Navigator.of(bCtx).pop();
+                                                },
+                                                child: const Text('确定'),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                            child: Text(selectedBirthDate == null ? '未设置' : AppUtils.formatUtcOrIsoToYMD(selectedBirthDate!)),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final newName = nameController.text.trim();
+                            if (newName.isEmpty) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('昵称不能为空'), backgroundColor: Colors.red));
+                              return;
+                            }
+
+                            // 显示全屏半透明 overlay
+                            showDialog(
+                              context: ctx,
+                              barrierDismissible: false,
+                              barrierColor: Colors.black.withOpacity(0.4),
+                              builder: (dCtx) => const Center(child: CircularProgressIndicator()),
+                            );
+
+                            final newCareReceiver = CareReceiver(
+                              id: '', // 由后端生成
+                              name: newName,
+                              gender: selectedGender,
+                              birthDate: selectedBirthDate == null ? null : AppUtils.formatUtcOrIsoToYMD(selectedBirthDate!),
+                              avatar: tempAvatar,
+                            );
+
+                            final success = await _createCareReceiver(newCareReceiver);
+
+                            // 关闭 overlay（对话框通常是挂载在根 Navigator 上）
+                            if (Navigator.of(context, rootNavigator: true).canPop()) {
+                              Navigator.of(context, rootNavigator: true).pop();
+                            }
+
+                            if (success) {
+                              // 保存成功后关闭编辑页（关闭 bottom sheet）
+                              if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+                            }
+                          },
+                          child: const Text('保存'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  /// 创建被照顾者，返回是否成功（不自动关闭编辑页）
+  Future<bool> _createCareReceiver(CareReceiver careReceiver) async {
+    try {
+      final resp = await _careReceiverService.createCareReceiver(
+        familyId: widget.family.id,
+        careReceiver: careReceiver,
+      );
+
+      if (resp.isSuccess) {
+        if (mounted) {
+          setState(() {
+            widget.family.careReceivers.add(resp.data!);
+          });
+        }
+        _updateAppState();
+
+        // 同步更新 AppStateService 中缓存的家庭数据（lastFamily 与 myFamilies）
+        final appState = AppStateService();
+        final createdCare = resp.data!;
+
+        // 更新 lastFamily 中的被照顾者列表
+        final lastFamily = appState.lastFamily;
+        if (lastFamily != null && lastFamily.id == widget.family.id) {
+          lastFamily.careReceivers = List.from(lastFamily.careReceivers)..add(createdCare);
+          appState.setLastFamily(lastFamily);
+        }
+
+        // 更新 myFamilies 列表中的对应家庭
+        final families = appState.myFamilies;
+        final fIdx = families.indexWhere((f) => f.id == widget.family.id);
+        if (fIdx >= 0) {
+          final foundFamily = families[fIdx];
+          final idx = foundFamily.careReceivers.indexWhere((f) => f.id == createdCare.id);
+          if (idx < 0) {
+            foundFamily.careReceivers = List.from(foundFamily.careReceivers)..add(createdCare);
+            families[fIdx] = foundFamily;
+            appState.setMyFamilies(families);
+          }
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('被照顾者已创建')));
+        return true;
+      } else {
+        final msg = resp.message ?? '创建失败';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+        _showErrorDialog(msg);
+        return false;
+      }
+    } catch (e) {
+      if (!mounted) return false;
+      final msg = '创建失败: ${e.toString()}';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      _showErrorDialog(msg);
+      return false;
+    }
   }
 
   void _showErrorMessage(String message) {
@@ -582,7 +837,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
     final nameController = TextEditingController(text: careReceiver.name);
     String? tempAvatar = careReceiver.avatar;
     String? selectedGender = careReceiver.gender;
-    DateTime? selectedBirthDate = careReceiver.birthDateAsDateTime;
+    DateTime? selectedBirthDate = AppUtils.dateTimeFromYMD(careReceiver.birthDate);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -679,17 +934,50 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                           TextButton(
                             onPressed: () async {
                               final now = DateTime.now();
-                              final first = DateTime(now.year - 120);
-                              final last = now;
-                              final picked = await showDatePicker(
+                              var tempDate = selectedBirthDate ?? now;
+
+                              await showModalBottomSheet<void>(
                                 context: ctx,
-                                initialDate: selectedBirthDate ?? DateTime(now.year - 30),
-                                firstDate: first,
-                                lastDate: last,
+                                builder: (bCtx) {
+                                  return SafeArea(
+                                    child: SizedBox(
+                                      height: 300,
+                                      child: Column(
+                                        children: [
+                                          Expanded(
+                                            child: CupertinoDatePicker(
+                                              mode: CupertinoDatePickerMode.date,
+                                              initialDateTime: tempDate,
+                                              maximumDate: now,
+                                              onDateTimeChanged: (val) {
+                                                tempDate = val;
+                                              },
+                                            ),
+                                          ),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                            children: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(bCtx).pop(),
+                                                child: const Text('取消'),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  setModalState(() => selectedBirthDate = tempDate);
+                                                  Navigator.of(bCtx).pop();
+                                                },
+                                                child: const Text('确定'),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               );
-                              if (picked != null) setModalState(() => selectedBirthDate = picked);
                             },
-                            child: Text(selectedBirthDate == null ? '未设置' : AppUtils.toYMD(selectedBirthDate!)),
+                            child: Text(selectedBirthDate == null ? '未设置' : AppUtils.formatUtcOrIsoToYMD(selectedBirthDate!)),
                           ),
                         ],
                       ),
@@ -709,7 +997,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                             final unchanged = newName == careReceiver.name &&
                                 (tempAvatar ?? '') == (careReceiver.avatar ?? '') &&
                                 (selectedGender ?? '') == (careReceiver.gender ?? '') &&
-                                (selectedBirthDate == careReceiver.birthDateAsDateTime);
+                                (selectedBirthDate == AppUtils.dateTimeFromYMD(careReceiver.birthDate));
                             if (unchanged) {
                               Navigator.of(ctx).pop();
                               return;
@@ -727,7 +1015,7 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
                               id: careReceiver.id,
                               name: newName,
                               gender: selectedGender,
-                              birthDate: selectedBirthDate == null ? null : AppUtils.toYMD(selectedBirthDate!),
+                              birthDate: selectedBirthDate == null ? null : AppUtils.formatUtcOrIsoToYMD(selectedBirthDate!),
                               avatar: tempAvatar,
                               residence: careReceiver.residence,
                               phone: careReceiver.phone,
@@ -797,7 +1085,6 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
           final cIdx = lastFamily.careReceivers.indexWhere((c) => c.id == updatedCare.id);
           if (cIdx >= 0) {
             lastFamily.careReceivers[cIdx] = updatedCare;
-            appState.setLastFamily(lastFamily);
           }
         }
 
@@ -1071,47 +1358,79 @@ class _FamilyDetailPageState extends State<FamilyDetailPage> {
               ),
             )
           else
-            ...widget.family.careReceivers.map((careReceiver) {
-              final canEditCareReceiver = _isPrimary;
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(12),
-                  leading: CircleAvatar(
-                    radius: 28,
-                    backgroundImage: AppImageUtils.imageProviderFor(
-                      careReceiver.avatar,
-                      defaultResource: 'resource:///dependent/default.png',
+            ...(() {
+              final orderedCareReceivers = List<CareReceiver>.from(widget.family.careReceivers);
+              final last = widget.family.lastCareReceiver;
+              if (last != null) {
+                final idx = orderedCareReceivers.indexWhere((c) => c.id == last.id);
+                if (idx > 0) {
+                  final item = orderedCareReceivers.removeAt(idx);
+                  orderedCareReceivers.insert(0, item);
+                }
+              }
+
+              return orderedCareReceivers.map((careReceiver) {
+                final canEditCareReceiver = _isPrimary;
+                final isSelected = widget.family.lastCareReceiver?.id == careReceiver.id;
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(12),
+                    leading: CircleAvatar(
+                      radius: 28,
+                      backgroundImage: AppImageUtils.imageProviderFor(
+                        careReceiver.avatar,
+                        defaultResource: 'resource:///dependent/default.png',
+                      ),
+                      child: AppImageUtils.imageProviderFor(
+                                careReceiver.avatar,
+                                defaultResource: 'resource:///dependent/default.png',
+                              ) ==
+                              null
+                          ? const Icon(Icons.person, size: 28)
+                          : null,
                     ),
-                    child: AppImageUtils.imageProviderFor(
-                              careReceiver.avatar,
-                              defaultResource: 'resource:///dependent/default.png',
-                            ) ==
-                            null
-                        ? const Icon(Icons.person, size: 28)
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            careReceiver.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (isSelected)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              '选中',
+                              style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                      ],
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        careReceiver.buildCareReceiverInfo(),
+                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      ),
+                    ),
+                    trailing: canEditCareReceiver ? const Icon(Icons.chevron_right) : null,
+                    onTap: canEditCareReceiver
+                        ? () => _handleCareReceiverTap(careReceiver)
                         : null,
                   ),
-                  title: Text(
-                    careReceiver.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      careReceiver.buildCareReceiverInfo(),
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                    ),
-                  ),
-                  trailing: canEditCareReceiver ? const Icon(Icons.chevron_right) : null,
-                  onTap: canEditCareReceiver
-                      ? () => _handleCareReceiverTap(careReceiver)
-                      : null,
-                ),
-              );
-            }),
+                );
+              });
+            }()),
 
           const SizedBox(height: 24),
 

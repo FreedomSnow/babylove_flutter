@@ -1,3 +1,5 @@
+import 'package:flutter/rendering.dart';
+
 import '../core/utils.dart';
 
 /// 紧急联系人模型
@@ -100,22 +102,8 @@ class CareReceiver {
 
   /// 从 JSON 创建实例
   factory CareReceiver.fromJson(Map<String, dynamic> json) {
-    // 解析 birth_date：从 UTC 毫秒时间转换为 YYYY-MM-DD 格式
-    String? birthDateStr;
-    final birthDateRaw = json['birth_date'];
-    int? birthDateMs;
-    if (birthDateRaw is int) {
-      birthDateMs = birthDateRaw;
-    } else if (birthDateRaw is String) {
-      birthDateMs = int.tryParse(birthDateRaw);
-    } else {
-      birthDateMs = null;
-    }
-
-    if (birthDateMs != null) {
-      final dateTime = DateTime.fromMillisecondsSinceEpoch(birthDateMs);
-      birthDateStr = AppUtils.toYMD(dateTime);
-    }
+    // 解析 birth_date：支持 UTC 毫秒或 ISO8601/日期字符串
+    final String? birthDateStr = AppUtils.formatUtcOrIsoToYMD(json['birth_date']);
 
     final String? avatarRaw = json['avatar'] as String?;
     final String avatarValue = (avatarRaw != null && avatarRaw.trim().isNotEmpty)
@@ -153,29 +141,13 @@ class CareReceiver {
     );
   }
 
-  /// 将 birthDate (YYYY-MM-DD 格式的字符串) 转换为 DateTime
-  DateTime? get birthDateAsDateTime {
-    return AppUtils.fromYMD(birthDate);
-  }
-
   /// 转换为 JSON
   Map<String, dynamic> toJson() {
-    // 将 birthDate (YYYY-MM-DD 格式) 转换回 UTC 毫秒时间
-    int birthDateMs = 0;
-    if (birthDate != null) {
-      try {
-        final dateTime = AppUtils.fromYMD(birthDate!);
-        if (dateTime != null) birthDateMs = dateTime.toUtc().millisecondsSinceEpoch;
-      } catch (e) {
-        birthDateMs = 0;
-      }
-    }
-
     return {
       'id': id,
       'name': name,
-      if (gender != null) 'gender': gender,
-      'birth_date': birthDateMs,
+      'gender': AppUtils.getGenderIntFromText(gender),
+      'birth_date': AppUtils.ymdToUtcMillis(birthDate),
       if (avatar != null) 'avatar': avatar,
       if (residence != null) 'residence': residence,
       if (phone != null) 'phone': phone,
@@ -193,7 +165,7 @@ class CareReceiver {
   ///
   /// 返回：格式化的信息字符串，例如：1941年11月25日 · 蛇 · 84岁 · 女
   String buildCareReceiverInfo() {
-    final birthDateTime = birthDateAsDateTime;
+    final birthDateTime = AppUtils.dateTimeFromYMD(birthDate);
     if (birthDateTime == null) {
       return gender != null ? "未知出生日期 · ${gender!}" : '未知出生日期';
     }

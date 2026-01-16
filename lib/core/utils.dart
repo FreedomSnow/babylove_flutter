@@ -109,7 +109,11 @@ class AppUtils {
     
     // 如果年龄为 0 岁
     if (years == 0) {
-      return months == 0 ? '未出生' : '$months个月';
+      if (months == 0) {
+        final days = now.difference(birthDate).inDays;
+        return days > 0 ? '$days天' : '未出生';
+      }
+      return '$months个月';
     }
     
     // 如果月数为 0，只显示年龄
@@ -131,16 +135,42 @@ class AppUtils {
     return '${date.year}年${date.month}月${date.day}日';
   }
 
-  /// 将 DateTime 转为 YYYY-MM-DD 格式的字符串
-  static String toYMD(DateTime date) {
-    final y = date.year.toString().padLeft(4, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    final d = date.day.toString().padLeft(2, '0');
+  /// 将 UTC 毫秒值或 ISO8601 字符串转换为 YYYY-MM-DD 字符串（本地时区，失败返回空字符串）
+  static String formatUtcOrIsoToYMD(dynamic value) {
+    if (value == null) return '';
+
+    DateTime? dt;
+    try {
+      if (value is DateTime) {
+        dt = value.toLocal();
+      } else if (value is int) {
+        dt = DateTime.fromMillisecondsSinceEpoch(value, isUtc: true).toLocal();
+      } else if (value is num) {
+        dt = DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true).toLocal();
+      } else if (value is String) {
+        final v = value.trim();
+        if (v.isEmpty) return '';
+
+        // 优先尝试 ISO8601 字符串
+        dt = DateTime.tryParse(v)?.toLocal();
+
+        // 如果解析失败，尝试当作 UTC 毫秒值处理
+        dt ??= DateTime.fromMillisecondsSinceEpoch(int.parse(v), isUtc: true).toLocal();
+      }
+    } catch (_) {
+      dt = null;
+    }
+
+    if (dt == null) return '';
+
+    final y = dt.year.toString().padLeft(4, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
     return '$y-$m-$d';
   }
 
   /// 将 YYYY-MM-DD 格式的字符串转换为 DateTime（本地时区，若解析失败返回 null）
-  static DateTime? fromYMD(String? ymd) {
+  static DateTime? dateTimeFromYMD(String? ymd) {
     if (ymd == null) return null;
     final s = ymd.trim();
     if (s.isEmpty) return null;
@@ -154,6 +184,14 @@ class AppUtils {
     } catch (e) {
       return null;
     }
+  }
+
+  /// 将 YYYY-MM-DD 字符串转换为 UTC 毫秒时间（用于仅关心日期的场景）
+  static int ymdToUtcMillis(String? ymd) {
+    final dt = dateTimeFromYMD(ymd);
+    if (dt == null) return 0;
+    // 使用 UTC 时区的当日零点，避免本地时区转换到 UTC 导致日期前移/后移
+    return DateTime.utc(dt.year, dt.month, dt.day).millisecondsSinceEpoch;
   }
 
   /// 构建被照顾者完整信息字符串
