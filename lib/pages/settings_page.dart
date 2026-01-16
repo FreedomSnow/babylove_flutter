@@ -1,3 +1,4 @@
+import 'package:babylove_flutter/core/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
@@ -89,20 +90,34 @@ class SettingsPage extends StatelessWidget {
     );
 
     if (confirm == true && context.mounted) {
+      // 显示半透明全屏加载遮罩
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black.withOpacity(0.35),
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
       try {
         await AuthService().logout();
         await StorageService().clearTokens();
-        
+
         if (context.mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const LoginPage()),
             (route) => false,
           );
         }
       } catch (e) {
+        if (Navigator.of(context, rootNavigator: true).canPop()) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('退出登录失败: $e')),
+          AppUtils.showInfoToast(
+            context,
+            message: '退出登录失败: ${e.toString()}',
+            type: ToastType.error,
           );
         }
       }

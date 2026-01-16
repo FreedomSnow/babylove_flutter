@@ -1,3 +1,5 @@
+import 'package:babylove_flutter/core/utils.dart';
+import 'package:babylove_flutter/services/auth_service.dart';
 import 'package:flutter/material.dart';
 
 /// 反馈页面
@@ -12,6 +14,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _contentController = TextEditingController();
+  final AuthService _authService = AuthService();
   bool _isSubmitting = false;
 
   @override
@@ -26,16 +29,52 @@ class _FeedbackPageState extends State<FeedbackPage> {
 
     setState(() => _isSubmitting = true);
 
-    // 模拟提交反馈
-    await Future.delayed(const Duration(seconds: 1));
+    // 显示全屏半透明加载遮罩
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
 
-    setState(() => _isSubmitting = false);
+    final contact = _emailController.text.trim();
+    final content = _contentController.text.trim();
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('反馈提交成功，感谢您的支持！')),
+    try {
+      final resp = await _authService.submitFeedback(contact: contact, content: content);
+
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      if (!mounted) return;
+
+      if (resp.isSuccess) {
+        AppUtils.showInfoToast(
+          context,
+          message: '反馈提交成功，感谢您的支持！',
+          type: ToastType.success,
+        );
+        Navigator.pop(context);
+      } else {
+        AppUtils.showInfoToast(
+          context,
+          message: resp.message ?? '反馈提交失败',
+          type: ToastType.error,
+        );
+      }
+    } catch (e) {
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      if (!mounted) return;
+      AppUtils.showInfoToast(
+        context,
+        message: '反馈提交失败: ${e.toString()}',
+        type: ToastType.error,
       );
-      Navigator.pop(context);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -44,21 +83,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('意见反馈'),
-        actions: [
-          TextButton(
-            onPressed: _isSubmitting ? null : _submit,
-            child: _isSubmitting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text(
-                    '提交',
-                    style: TextStyle(color: Colors.white),
-                  ),
-          ),
-        ],
       ),
       body: Form(
         key: _formKey,
@@ -151,16 +175,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text(
-                      '提交反馈',
-                      style: TextStyle(fontSize: 16),
-                    ),
+              child: const Text(
+                '提交反馈',
+                style: TextStyle(fontSize: 16),
+              ),
             ),
 
             const SizedBox(height: 16),
