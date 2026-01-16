@@ -23,7 +23,7 @@ class FamilyMember {
   /// 从 JSON 创建实例
   factory FamilyMember.fromJson(Map<String, dynamic> json) {
     return FamilyMember(
-      id: json['id']?.toString() ?? '',
+      id: json['id']?.toString() ?? json['user_id']?.toString() ?? '',
       familyId: json['family_id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
       role: json['role'] as String? ?? '',

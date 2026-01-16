@@ -54,6 +54,15 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
     );
   }
 
+  void _showErrorDialog(String message) {
+    AppUtils.showErrorDialog(
+      context,
+      title: '错误',
+      message: message,
+      okText: '确定',
+    );
+  }
+
   Future<void> _showBirthDatePicker() async {
     final now = DateTime.now();
     DateTime tempDate = _careBirthDate ?? now;
@@ -197,12 +206,15 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
           (route) => false,
         );
       } else {
-        _showSnackBar('创建失败: ${resp.message}', Theme.of(context).colorScheme.error);
+        final msg = '创建家庭失败: ${resp.message ?? '未知错误'}';
+        _showErrorDialog(msg);
       }
     } on NetworkException catch (e) {
-      _showSnackBar('创建失败: ${e.message}', Theme.of(context).colorScheme.error);
+      final msg = '创建失败: ${e.message}';
+      _showErrorDialog(msg);
     } catch (e) {
-      _showSnackBar('创建失败: $e', Theme.of(context).colorScheme.error);
+      final msg = '创建家庭失败: $e';
+      _showErrorDialog(msg);
     } finally {
       if (mounted) {
         setState(() {

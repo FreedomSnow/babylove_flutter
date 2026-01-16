@@ -1,7 +1,26 @@
+import 'package:flutter/material.dart';
+
+/// 信息提示类型
+enum ToastType { info, success, warning, error }
+
+class _ToastStyle {
+  final Color background;
+  final IconData icon;
+
+  const _ToastStyle({required this.background, required this.icon});
+}
+
 /// 通用工具类
 /// 提供应用中常用的辅助方法
 class AppUtils {
   AppUtils._();
+
+  static final Map<ToastType, _ToastStyle> _toastStyles = {
+    ToastType.info: const _ToastStyle(background: Color(0xFF1E88E5), icon: Icons.info_outline),
+    ToastType.success: const _ToastStyle(background: Color(0xFF2E7D32), icon: Icons.check_circle_outline),
+    ToastType.warning: const _ToastStyle(background: Color(0xFFF57C00), icon: Icons.warning_amber_outlined),
+    ToastType.error: const _ToastStyle(background: Color(0xFFC62828), icon: Icons.error_outline),
+  };
 
   /// 将性别字符串转换为中文文本
   ///
@@ -214,5 +233,132 @@ class AppUtils {
     final genderText = getGenderText(gender);
 
     return '${formatDateChinese(birthDate)} · $zodiac · $ageStr · $genderText';
+  }
+
+  /// 显示居中提示气泡，自动消失
+  /// [type] 控制配色与图标；[duration] 控制显示时长；默认 3 秒
+  static Future<void> showInfoToast(
+    BuildContext context, {
+    required String message,
+    ToastType type = ToastType.info,
+    Duration duration = const Duration(seconds: 3),
+  }) async {
+    final overlay = Overlay.of(context, rootOverlay: true);
+
+    final style = _toastStyles[type]!;
+
+    final entry = OverlayEntry(
+      builder: (ctx) => Positioned.fill(
+        child: IgnorePointer(
+          ignoring: true,
+          child: Center(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 180),
+              builder: (context, value, child) => Opacity(
+                opacity: value,
+                child: Transform.scale(
+                  scale: 0.95 + 0.05 * value,
+                  child: child,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  decoration: BoxDecoration(
+                    color: style.background.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(style.icon, color: Colors.white, size: 22),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          message,
+                          style: const TextStyle(color: Colors.white, fontSize: 15),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(entry);
+    await Future.delayed(duration);
+    entry.remove();
+  }
+  /// 显示通用错误弹窗（例如网络错误等）
+  ///
+  /// 参数：
+  /// - [context] 上下文
+  /// - [title] 标题（默认："发生错误"）
+  /// - [message] 主文案（例如错误提示）
+  /// - [okText] 确认按钮文字（默认："确定"）
+  /// - [details] 额外的错误详情（可选）
+  /// - [onOk] 点击确定后的回调（可选）
+  ///
+  /// 返回：用户点击确定返回 true；其他情况返回 false。
+  static Future<bool> showErrorDialog(
+    BuildContext context, {
+    String? title,
+    String? message,
+    String okText = '确定',
+    String? details,
+    VoidCallback? onOk,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(title ?? '发生错误'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (message != null && message.isNotEmpty) Text(message),
+              if (details != null && details.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    details,
+                    style: Theme.of(ctx)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.black54),
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop(true);
+                onOk?.call();
+              },
+              child: Text(okText),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
   }
 }
